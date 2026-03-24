@@ -1,0 +1,2041 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com">
+<title>SOC — IP Threat Analyzer v5.3</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600&display=swap');
+
+  :root {
+    --bg-primary: #0a0e1a;
+    --bg-secondary: #0f1628;
+    --bg-card: #131c30;
+    --bg-card-hover: #172035;
+    --bg-input: #0d1422;
+    --border: #1e2d4a;
+    --border-bright: #2a3f66;
+    --accent-blue: #3b82f6;
+    --accent-cyan: #06b6d4;
+    --accent-green: #10b981;
+    --accent-yellow: #f59e0b;
+    --accent-red: #ef4444;
+    --accent-purple: #8b5cf6;
+    --text-primary: #e2e8f0;
+    --text-secondary: #64748b;
+    --text-muted: #334155;
+    --glow-blue: rgba(59,130,246,0.15);
+    --glow-cyan: rgba(6,182,212,0.15);
+    --glow-green: rgba(16,185,129,0.1);
+    --glow-red: rgba(239,68,68,0.1);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    min-height: 100vh;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+    pointer-events: none;
+    z-index: 1000;
+  }
+
+  /* TOPBAR */
+  .topbar {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    padding: 0 2rem;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .topbar-left { display: flex; align-items: center; gap: 12px; }
+  .logo-icon {
+    width: 32px; height: 32px;
+    background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center; font-size: 16px;
+  }
+  .logo-text { font-size: 14px; font-weight: 600; color: var(--text-primary); letter-spacing: 0.05em; text-transform: uppercase; }
+  .logo-sub {
+    font-size: 11px; color: var(--text-secondary); letter-spacing: 0.08em; text-transform: uppercase;
+    margin-left: 4px; border-left: 1px solid var(--border-bright); padding-left: 12px;
+  }
+  .topbar-right { display: flex; align-items: center; gap: 16px; font-size: 12px; font-family: 'JetBrains Mono', monospace; color: var(--text-secondary); }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-green); box-shadow: 0 0 8px var(--accent-green); animation: pulse-green 2s infinite; }
+  @keyframes pulse-green { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+
+  /* MAIN */
+  .main { padding: 1.5rem 2rem; max-width: 1400px; margin: 0 auto; }
+
+  /* SECTION TITLE */
+  .section-title {
+    font-size: 11px; font-weight: 600; color: var(--accent-cyan);
+    text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 12px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+  .section-num {
+    width: 22px; height: 22px; border-radius: 50%; background: var(--accent-cyan);
+    color: #000; font-size: 11px; font-weight: 700;
+    display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+
+  /* CARD */
+  .card {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 1.25rem; margin-bottom: 1rem; position: relative; overflow: hidden;
+  }
+  .card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent-blue), transparent); opacity: 0.5;
+  }
+  .card-corner { position: absolute; top: 10px; right: 14px; font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; letter-spacing: 0.1em; }
+
+  /* FORM */
+  label { display: block; font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+  input[type=text] {
+    width: 100%; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 14px; font-size: 13px; font-family: 'JetBrains Mono', monospace;
+    color: var(--text-primary); height: 40px; transition: border-color 0.2s;
+  }
+  input[type=text]:focus { outline: none; border-color: var(--accent-blue); box-shadow: 0 0 0 3px var(--glow-blue); }
+  textarea {
+    width: 100%; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px 14px; font-size: 12px; font-family: 'JetBrains Mono', monospace;
+    color: var(--text-primary); resize: vertical; min-height: 100px; line-height: 1.6; transition: border-color 0.2s;
+  }
+  textarea:focus { outline: none; border-color: var(--accent-blue); box-shadow: 0 0 0 3px var(--glow-blue); }
+  select {
+    background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 14px; font-size: 12px; color: var(--text-primary); height: 40px;
+    cursor: pointer; transition: border-color 0.2s; width: 100%;
+    font-family: 'Inter', sans-serif;
+  }
+  select:focus { outline: none; border-color: var(--accent-blue); }
+
+  /* BUTTONS */
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 0 18px; height: 40px; font-size: 13px; font-weight: 500;
+    border-radius: 8px; cursor: pointer; transition: all 0.2s;
+    border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary);
+    font-family: 'Inter', sans-serif; white-space: nowrap;
+  }
+  .btn:hover { background: var(--bg-card-hover); border-color: var(--border-bright); }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--accent-blue); border-color: var(--accent-blue); color: #fff; font-weight: 600; box-shadow: 0 0 20px rgba(59,130,246,0.3); }
+  .btn-primary:hover { background: #2563eb; border-color: #2563eb; box-shadow: 0 0 30px rgba(59,130,246,0.5); }
+  .btn-cyan { background: rgba(6,182,212,0.15); border-color: var(--accent-cyan); color: var(--accent-cyan); }
+  .btn-cyan:hover { background: rgba(6,182,212,0.25); }
+  .btn-green { background: rgba(16,185,129,0.15); border-color: var(--accent-green); color: var(--accent-green); }
+  .btn-green:hover { background: rgba(16,185,129,0.25); }
+  .btn-red { background: rgba(239,68,68,0.12); border-color: var(--accent-red); color: var(--accent-red); }
+  .btn-red:hover { background: rgba(239,68,68,0.25); }
+  .btn-abort { background: rgba(239,68,68,0.15); border-color: var(--accent-red); color: var(--accent-red); }
+  .btn-sm { height: 32px; padding: 0 14px; font-size: 12px; }
+  .btn-xs { height: 26px; padding: 0 10px; font-size: 11px; border-radius: 6px; }
+  .btn-icon { width: 40px; padding: 0; justify-content: center; font-size: 16px; }
+  .btn-icon-sm { width: 32px; height: 32px; padding: 0; justify-content: center; font-size: 14px; border-radius: 6px; }
+
+  /* GRID */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
+
+  /* PROGRESS */
+  .progress-bar { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent-blue), var(--accent-cyan)); border-radius: 2px; transition: width 0.3s; box-shadow: 0 0 8px var(--accent-cyan); }
+  .progress-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 12px; font-family: 'JetBrains Mono', monospace; }
+  .progress-ip { font-size: 11px; color: var(--text-secondary); font-family: 'JetBrains Mono', monospace; margin-top: 6px; }
+
+  /* SPINNER */
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border-bright); border-top-color: var(--accent-blue); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* TABS */
+  .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin-bottom: 1.25rem; }
+  .tab { padding: 10px 18px; font-size: 12px; font-weight: 500; border: none; background: none; color: var(--text-secondary); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.2s; font-family: 'Inter', sans-serif; text-transform: uppercase; letter-spacing: 0.05em; }
+  .tab:hover { color: var(--text-primary); }
+  .tab.active { color: var(--accent-cyan); border-bottom-color: var(--accent-cyan); }
+
+  /* TABLE */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  thead tr { border-bottom: 1px solid var(--border); }
+  th { font-size: 10px; font-weight: 600; color: var(--text-secondary); text-align: left; padding: 10px 12px; text-transform: uppercase; letter-spacing: 0.08em; white-space: nowrap; }
+  td { padding: 9px 12px; border-bottom: 1px solid rgba(30,45,74,0.5); color: var(--text-primary); font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+  tbody tr:hover td { background: var(--bg-card-hover); }
+  tbody tr:last-child td { border-bottom: none; }
+
+  /* BADGES */
+  .badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+  .badge::before { content: ''; width: 5px; height: 5px; border-radius: 50%; }
+  .badge-low { background: rgba(16,185,129,0.12); color: #34d399; border: 1px solid rgba(16,185,129,0.25); }
+  .badge-low::before { background: #10b981; }
+  .badge-mid { background: rgba(245,158,11,0.12); color: #fbbf24; border: 1px solid rgba(245,158,11,0.25); }
+  .badge-mid::before { background: #f59e0b; }
+  .badge-high { background: rgba(239,68,68,0.12); color: #f87171; border: 1px solid rgba(239,68,68,0.25); animation: glow-red 2s infinite; }
+  .badge-high::before { background: var(--accent-red); }
+  @keyframes glow-red { 0%,100% { box-shadow: none; } 50% { box-shadow: 0 0 8px rgba(239,68,68,0.3); } }
+  .badge-br { background: rgba(59,130,246,0.12); color: #60a5fa; border: 1px solid rgba(59,130,246,0.25); }
+  .badge-br::before { background: var(--accent-blue); }
+  .badge-akamai { background: rgba(245,158,11,0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.4); font-weight: 700; }
+  .badge-akamai::before { background: #f59e0b; }
+  .badge-internal { background: rgba(139,92,246,0.15); color: #a78bfa; border: 1px solid rgba(139,92,246,0.4); }
+  .badge-internal::before { background: #8b5cf6; }
+  .ip-list-item.is-akamai { border-left: 3px solid #f59e0b; opacity: 0.75; }
+  .ip-list-item.is-internal { border-left: 3px solid #8b5cf6; opacity: 0.75; }
+  .protected-warning {
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.3);
+    border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;
+    font-size: 12px; color: #fbbf24; font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* OUTPUT */
+  .output-area { background: #060910; border: 1px solid var(--border); border-radius: 8px; padding: 16px; font-family: 'JetBrains Mono', monospace; font-size: 11px; line-height: 1.7; color: #a5f3fc; max-height: 260px; overflow-y: auto; white-space: pre; }
+  .output-area::-webkit-scrollbar { width: 6px; }
+  .output-area::-webkit-scrollbar-track { background: transparent; }
+  .output-area::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 3px; }
+  .output-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .output-label { font-size: 11px; color: var(--text-secondary); font-family: 'JetBrains Mono', monospace; }
+
+  /* FILTER ROW */
+  .filter-row { display: flex; gap: 12px; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; padding: 10px 14px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; }
+  .checkbox-label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); cursor: pointer; user-select: none; transition: color 0.2s; }
+  .checkbox-label:hover { color: var(--text-primary); }
+  .checkbox-label input[type=checkbox] { width: 14px; height: 14px; accent-color: var(--accent-blue); cursor: pointer; }
+  .divider { width: 1px; height: 20px; background: var(--border); }
+
+  /* STATUS */
+  .status-block { color: var(--accent-green); font-size: 11px; }
+  .status-br { color: var(--accent-blue); font-size: 11px; }
+  .status-risk { color: var(--accent-red); font-size: 11px; }
+
+  /* METRICS */
+  .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 1rem; }
+  .metric-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 1rem 1.25rem; }
+  .metric-card.blue { border-left: 3px solid var(--accent-blue); }
+  .metric-card.red { border-left: 3px solid var(--accent-red); }
+  .metric-card.cyan { border-left: 3px solid var(--accent-cyan); }
+  .metric-card.green { border-left: 3px solid var(--accent-green); }
+  .metric-label { font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; font-weight: 500; }
+  .metric-value { font-size: 30px; font-weight: 600; font-family: 'JetBrains Mono', monospace; line-height: 1; }
+  .metric-card.blue .metric-value { color: var(--accent-blue); }
+  .metric-card.red .metric-value { color: var(--accent-red); }
+  .metric-card.cyan .metric-value { color: var(--accent-cyan); }
+  .metric-card.green .metric-value { color: var(--accent-green); }
+  .metric-sub { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
+
+  /* HIDDEN */
+  .hidden { display: none !important; }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: var(--bg-primary); }
+  ::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 4px; }
+
+  /* ── SECTION 1 — IP ÚNICO ── */
+  .attack-row { display: flex; gap: 8px; align-items: flex-end; }
+  .attack-select-wrap { flex: 1; }
+  .add-attack-row { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+  .add-attack-input { flex: 1; height: 36px; font-size: 12px; }
+  .ip-result-card {
+    background: var(--bg-input); border: 1px solid var(--border-bright); border-radius: 10px;
+    padding: 1rem 1.25rem; margin-top: 1rem; display: none;
+  }
+  .ip-result-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+  .ip-result-item { }
+  .ip-result-label { font-size: 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px; }
+  .ip-result-value { font-size: 13px; font-family: 'JetBrains Mono', monospace; color: var(--text-primary); }
+  .ip-cmd-box { background: #060910; border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #a5f3fc; white-space: pre-wrap; word-break: break-all; margin-top: 10px; }
+
+  /* ── SECTION 2 — PRINT ── */
+  .dropzone {
+    border: 2px dashed var(--border-bright); border-radius: 12px; padding: 2.5rem;
+    text-align: center; cursor: pointer; transition: all 0.2s; position: relative;
+    background: var(--bg-input);
+  }
+  .dropzone:hover, .dropzone.dragover { border-color: var(--accent-cyan); background: rgba(6,182,212,0.05); }
+  .dropzone-icon { font-size: 36px; margin-bottom: 12px; }
+  .dropzone-text { font-size: 14px; color: var(--text-secondary); margin-bottom: 6px; }
+  .dropzone-sub { font-size: 12px; color: var(--text-muted); }
+  .dropzone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .img-preview { max-width: 100%; max-height: 300px; border-radius: 8px; border: 1px solid var(--border); margin-top: 12px; display: none; }
+  .ocr-results-list { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+  .ocr-item {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 12px; font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  }
+  .ocr-item-ip { color: var(--accent-cyan); min-width: 130px; }
+  .ocr-item-prot { color: var(--text-secondary); flex: 1; font-size: 11px; }
+  .ocr-item-status { font-size: 11px; min-width: 70px; text-align: right; }
+
+  /* ── PROTECTED IPs ── */
+  .badge-protected {
+    background: rgba(245,158,11,0.15); color: #fbbf24;
+    border: 1px solid rgba(245,158,11,0.4);
+    font-size: 11px; font-weight: 700; padding: 3px 10px;
+    border-radius: 20px; font-family: 'JetBrains Mono', monospace;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .badge-protected::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: #f59e0b; }
+  .badge-internal {
+    background: rgba(139,92,246,0.15); color: #a78bfa;
+    border: 1px solid rgba(139,92,246,0.4);
+    font-size: 11px; font-weight: 700; padding: 3px 10px;
+    border-radius: 20px; font-family: 'JetBrains Mono', monospace;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .badge-internal::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: #8b5cf6; }
+  .ip-list-item.is-protected { border-left: 3px solid #f59e0b; background: rgba(245,158,11,0.04); }
+  .ip-list-item.is-internal  { border-left: 3px solid #8b5cf6; background: rgba(139,92,246,0.04); }
+  .protected-warning {
+    background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.3);
+    border-radius: 8px; padding: 10px 14px; margin-bottom: 1rem;
+    font-size: 12px; color: #fbbf24; display: flex; align-items: flex-start; gap: 10px;
+  }
+  .protected-warning strong { display: block; margin-bottom: 4px; font-size: 13px; }
+
+  /* ── SECTION 2 — INPUT TABS ── */
+  .sec2-tabs { display: flex; gap: 4px; margin-bottom: 1rem; }
+  .sec2-tab {
+    padding: 7px 16px; font-size: 12px; font-weight: 500; border-radius: 8px;
+    border: 1px solid var(--border); background: transparent;
+    color: var(--text-secondary); cursor: pointer; transition: all 0.2s;
+    font-family: 'Inter', sans-serif;
+  }
+  .sec2-tab:hover { color: var(--text-primary); border-color: var(--border-bright); }
+  .sec2-tab.active { background: rgba(6,182,212,0.12); border-color: var(--accent-cyan); color: var(--accent-cyan); }
+  .sec2-panel { }
+
+  /* ── SECTION 3 — LISTA ── */
+  .ip-list-item {
+    display: grid;
+    grid-template-columns: 26px 130px 70px 100px 140px 90px 70px 1fr 36px;
+    gap: 8px; align-items: center;
+    background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 12px; margin-bottom: 6px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    transition: border-color 0.2s;
+  }
+  .ip-list-item:hover { border-color: var(--border-bright); }
+  .ip-list-item.is-br { border-left: 3px solid var(--accent-blue); opacity: 0.6; }
+  .ip-list-item.is-high { border-left: 3px solid var(--accent-red); }
+  .item-num { color: var(--text-muted); font-size: 10px; text-align: center; }
+  .item-ip { color: var(--accent-cyan); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .item-country { color: var(--text-secondary); }
+  .item-isp { color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
+  .item-prot { color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
+  .item-city { color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
+  .item-remove { width: 28px; height: 28px; border-radius: 6px; border: 1px solid rgba(239,68,68,0.3); background: transparent; color: var(--accent-red); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; transition: all 0.2s; padding: 0; }
+  .item-remove:hover { background: rgba(239,68,68,0.2); border-color: var(--accent-red); }
+  .list-header {
+    display: grid;
+    grid-template-columns: 26px 130px 70px 100px 140px 90px 70px 1fr 36px;
+    gap: 8px; padding: 6px 12px; margin-bottom: 6px;
+    font-size: 10px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  .empty-list { text-align: center; padding: 2rem; color: var(--text-secondary); font-size: 13px; }
+
+  @media (max-width: 900px) {
+    .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+    .grid-2 { grid-template-columns: 1fr; }
+    .ip-list-item { grid-template-columns: 26px 1fr 70px 36px; }
+    .ip-list-item > *:nth-child(4), .ip-list-item > *:nth-child(5),
+    .ip-list-item > *:nth-child(6), .ip-list-item > *:nth-child(7),
+    .ip-list-item > *:nth-child(8) { display: none; }
+    .list-header { display: none; }
+    .main { padding: 1rem; }
+  }
+
+  /* ── SECTION 4 — CALCULADORA DE SUB-REDE ── */
+  .subnet-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 1rem;
+  }
+  .subnet-field label {
+    display: block; font-size: 10px; font-weight: 600; color: var(--text-secondary);
+    text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px;
+  }
+  .subnet-output {
+    background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px;
+    padding: 9px 14px; font-size: 12px; font-family: 'JetBrains Mono', monospace;
+    color: var(--accent-cyan); height: 40px; display: flex; align-items: center;
+  }
+  .subnet-details-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 4px; }
+  .subnet-details-table thead tr { border-bottom: 1px solid var(--border-bright); }
+  .subnet-details-table th {
+    font-size: 10px; font-weight: 600; color: var(--accent-cyan);
+    text-align: left; padding: 10px 12px;
+    text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  .subnet-details-table td {
+    padding: 8px 12px; border-bottom: 1px solid rgba(30,45,74,0.5);
+    color: var(--text-primary); font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  }
+  .subnet-details-table tbody tr:hover td { background: var(--bg-card-hover); }
+  .subnet-details-table tbody tr:last-child td { border-bottom: none; }
+  .subnet-row-limit { color: var(--text-secondary); font-size: 11px; font-style: italic; padding: 8px 12px; }
+  .subnet-block-cmd { background: #060910; border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #a5f3fc; white-space: pre; overflow-x: auto; max-height: 220px; overflow-y: auto; line-height: 1.7; }
+  .subnet-info-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 1rem;
+  }
+  .subnet-info-item { background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; }
+  .subnet-info-label { font-size: 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px; }
+  .subnet-info-value { font-size: 12px; font-family: 'JetBrains Mono', monospace; color: var(--accent-cyan); }
+  @media (max-width: 900px) {
+    .subnet-grid { grid-template-columns: repeat(2, 1fr); }
+    .subnet-info-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="logo-icon">🛡️</div>
+    <span class="logo-text">SOC</span>
+    <span class="logo-sub">IP Threat Analyzer v5.3 — Check Point</span>
+  </div>
+  <div class="topbar-right">
+    <div class="status-dot"></div>
+    <span id="clockDisplay">--:--:--</span>
+    <span id="serverStatus" style="color: var(--text-muted);">servidor...</span>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- ════════════════════════════════════════════ -->
+  <!-- SEÇÃO 1 — IP ÚNICO                          -->
+  <!-- ════════════════════════════════════════════ -->
+  <div class="section-title">
+    <span class="section-num">1</span>
+    Consulta de IP Único
+  </div>
+
+  <div class="card">
+    <div class="card-corner">SINGLE IP</div>
+
+    <div class="grid-2" style="margin-bottom: 1rem;">
+      <div>
+        <label>Endereço IP</label>
+        <input type="text" id="singleIP" placeholder="Ex: 103.74.20.136" onkeydown="if(event.key==='Enter') consultarSingle()" />
+      </div>
+      <div>
+        <label>Grupo Check Point</label>
+        <input type="text" id="groupName" />
+      </div>
+    </div>
+
+    <div style="margin-bottom: 1rem;">
+      <label>Protection Name / Ataque</label>
+      <div class="attack-row">
+        <div class="attack-select-wrap">
+          <select id="attackSelect">
+            <option value="">Carregando ataques...</option>
+          </select>
+        </div>
+        <button class="btn btn-icon" title="Adicionar novo ataque" onclick="toggleAddAttack()">+</button>
+      </div>
+      <div class="add-attack-row hidden" id="addAttackRow">
+        <input type="text" class="add-attack-input" id="newAttackInput" placeholder="Nome do novo ataque..." onkeydown="if(event.key==='Enter') saveNewAttack()" />
+        <button class="btn btn-green btn-sm" onclick="saveNewAttack()">Salvar</button>
+        <button class="btn btn-sm" onclick="toggleAddAttack()">Cancelar</button>
+      </div>
+    </div>
+
+    <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+      <button class="btn btn-primary" id="btnSingle" onclick="consultarSingle()">🔍 Consultar IP</button>
+      <span id="singleStatus" style="font-size: 12px; color: var(--text-secondary); font-family: 'JetBrains Mono', monospace;"></span>
+    </div>
+
+    <!-- RESULTADO IP ÚNICO -->
+    <div class="ip-result-card" id="singleResult">
+      <div class="ip-result-grid">
+        <div class="ip-result-item">
+          <div class="ip-result-label">IP</div>
+          <div class="ip-result-value" id="r-ip">—</div>
+        </div>
+        <div class="ip-result-item">
+          <div class="ip-result-label">País</div>
+          <div class="ip-result-value" id="r-country">—</div>
+        </div>
+        <div class="ip-result-item">
+          <div class="ip-result-label">Cidade</div>
+          <div class="ip-result-value" style="font-size:11px;" id="r-city">—</div>
+        </div>
+        <div class="ip-result-item">
+          <div class="ip-result-label">ISP</div>
+          <div class="ip-result-value" style="font-size:11px;" id="r-isp">—</div>
+        </div>
+        <div class="ip-result-item">
+          <div class="ip-result-label">Abuso</div>
+          <div class="ip-result-value" id="r-abuse">—</div>
+        </div>
+        <div class="ip-result-item">
+          <div class="ip-result-label">Reports (365d)</div>
+          <div class="ip-result-value" id="r-reports">—</div>
+        </div>
+        <div class="ip-result-item">
+          <div class="ip-result-label">Usuários distintos</div>
+          <div class="ip-result-value" id="r-users">—</div>
+        </div>
+        <div class="ip-result-item">
+          <div class="ip-result-label">Último report</div>
+          <div class="ip-result-value" style="font-size:11px;" id="r-last">—</div>
+        </div>
+        <div class="ip-result-item">
+          <div class="ip-result-label">Tipo de Uso</div>
+          <div class="ip-result-value" style="font-size:11px;" id="r-type">—</div>
+        </div>
+        <div class="ip-result-item">
+          <div class="ip-result-label">ASN</div>
+          <div class="ip-result-value" style="font-size:11px;" id="r-asn">—</div>
+        </div>
+        <div class="ip-result-item">
+          <div class="ip-result-label">Domínio</div>
+          <div class="ip-result-value" style="font-size:11px;" id="r-domain">—</div>
+        </div>
+        <div class="ip-result-item">
+          <div class="ip-result-label">Status</div>
+          <div class="ip-result-value" id="r-status">—</div>
+        </div>
+      </div>
+      <div class="ip-cmd-box" id="r-cmd"></div>
+      <div style="display: flex; gap: 8px; margin-top: 10px;">
+        <button class="btn btn-green btn-sm" onclick="adicionarSingleNaLista()">➕ Adicionar à lista</button>
+        <button class="btn btn-sm" onclick="copiarCmd(this)">📋 Copiar comando</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ════════════════════════════════════════════ -->
+  <!-- SEÇÃO 2 — ANÁLISE DE PRINT                  -->
+  <!-- ════════════════════════════════════════════ -->
+  <div class="section-title">
+    <span class="section-num">2</span>
+    Análise de Print / Screenshot
+  </div>
+
+  <div class="card">
+    <div class="card-corner">OCR + ABUSE</div>
+
+    <!-- SUB-TABS: Imagem / Lista de IPs -->
+    <div class="sec2-tabs">
+      <button class="sec2-tab active" id="sec2TabImg" onclick="switchSec2('img')">📸 Imagem / Print</button>
+      <button class="sec2-tab" id="sec2TabList" onclick="switchSec2('list')">📝 Lista de IPs</button>
+    </div>
+
+    <!-- PANEL: IMAGEM -->
+    <div class="sec2-panel" id="sec2PanelImg">
+      <div class="grid-2" style="margin-bottom: 1rem; align-items: start;">
+        <div>
+          <label>Imagem do Firewall/WAF</label>
+          <div class="dropzone" id="dropzone">
+            <input type="file" id="imageFile" accept="image/*" onchange="handleFileSelect(this)" />
+            <div class="dropzone-icon">📋</div>
+            <div class="dropzone-text">Clique para selecionar ou arraste uma imagem</div>
+            <div class="dropzone-sub">Também funciona com Ctrl+V para colar direto do clipboard</div>
+          </div>
+          <img id="imgPreview" class="img-preview" alt="Preview" />
+        </div>
+        <div>
+          <label>Configurações da extração</label>
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <label class="checkbox-label" style="margin: 0;">
+              <input type="checkbox" id="ocrIgnoreBR" checked> Ignorar IPs brasileiros
+            </label>
+            <label class="checkbox-label" style="margin: 0;">
+              <input type="checkbox" id="ocrAutoAbuse" checked> Consultar AbuseIPDB automaticamente
+            </label>
+            <div style="margin-top:6px;">
+              <label style="margin-bottom:6px;">Modo de extração</label>
+              <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px;">
+                <label class="checkbox-label" style="margin:0;gap:8px;">
+                  <input type="radio" name="ocrMode" id="ocrModeFull" value="full" checked
+                    style="accent-color:var(--accent-cyan);width:14px;height:14px;"
+                    onchange="document.getElementById('ocrIpsOnlyAttack').classList.add('hidden');">
+                  <span>
+                    <span style="color:var(--text-primary);font-size:12px;">🔍 Print completo (IP + ataque) ** BETA **</span><br>
+                    <span style="color:var(--text-muted);font-size:10px;">Extrai IPs entre () e detecta o ataque pelo texto da linha</span>
+                  </span>
+                </label>
+                <label class="checkbox-label" style="margin:0;gap:8px;">
+                  <input type="radio" name="ocrMode" id="ocrModeIPs" value="ips_only"
+                    style="accent-color:var(--accent-cyan);width:14px;height:14px;"
+                    onchange="document.getElementById('ocrIpsOnlyAttack').classList.remove('hidden');"
+                    >
+                  <span>
+                    <span style="color:var(--text-primary);font-size:12px;">📋 Somente IPs</span><br>
+                    <span style="color:var(--text-muted);font-size:10px;">Extrair apenas IPs da imagem</span>
+                  </span>
+                </label>
+                <!-- Select de ataque visível apenas no modo ips_only -->
+                <div id="ocrIpsOnlyAttack" class="hidden" style="margin-top:4px;">
+                  <label style="font-size:10px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;display:block;">Protection Name / Ataque</label>
+                  <select id="ocrIpsOnlySelect" style="height:36px;font-size:12px;width:100%;">
+                    <option value="Atividade Suspeita">Atividade Suspeita</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px;">
+        <button class="btn btn-cyan" id="btnExtract" onclick="extrairDoprint()">🔬 Extrair IPs do Print</button>
+        <button class="btn btn-sm" onclick="limparOCR()">✕ Limpar</button>
+        <span id="ocrStatus" style="font-size: 12px; color: var(--text-secondary); font-family: 'JetBrains Mono', monospace;"></span>
+      </div>
+
+      <!-- PROGRESS OCR -->
+      <div id="ocrProgress" class="hidden" style="margin-bottom: 12px;">
+        <div class="progress-header">
+          <span style="color: var(--accent-cyan);"><span class="spinner"></span>&nbsp; Processando imagem...</span>
+          <span id="ocrPct" style="color: var(--accent-blue);">0%</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" id="ocrProgressFill" style="width: 0%"></div></div>
+        <div class="progress-ip" id="ocrProgressLabel">Aguardando...</div>
+      </div>
+
+      <!-- OCR RESULTS -->
+      <div id="ocrResultsSection" class="hidden">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <span style="font-size: 12px; color: var(--text-secondary);" id="ocrResultCount">0 IPs extraídos</span>
+          <button class="btn btn-green btn-sm" onclick="adicionarTodosOCR()">➕ Adicionar todos à lista</button>
+        </div>
+        <div class="ocr-results-list" id="ocrResultsList"></div>
+      </div>
+    </div>
+
+    <!-- PANEL: LISTA DE IPs -->
+    <div class="sec2-panel hidden" id="sec2PanelList">
+      <div class="grid-2" style="margin-bottom: 1rem; align-items: start;">
+        <div>
+          <label>Cole a lista de IPs ou carregue um arquivo .txt</label>
+          <textarea id="ipBulkInput" placeholder="82.207.26.46&#10;47.253.135.170&#10;103.48.64.234&#10;186.250.130.51&#10;103.134.2.60&#10;66.167.147.183&#10;47.74.37.40&#10;112.120.58.8&#10;168.197.51.176" style="min-height: 160px; font-size: 12px;"></textarea>
+          <div style="margin-top: 8px; display: flex; gap: 8px; align-items: center;">
+            <label class="btn btn-sm" style="cursor:pointer; height:32px; display:inline-flex; align-items:center; gap:6px;">
+              📁 Carregar .txt
+              <input type="file" id="ipBulkFile" accept=".txt" onchange="loadIPFile(this)" style="display:none;" />
+            </label>
+            <span id="ipBulkFileStatus" style="font-size:11px; color:var(--text-secondary);"></span>
+          </div>
+        </div>
+        <div>
+          <label>Configurações</label>
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <label class="checkbox-label" style="margin: 0;">
+              <input type="checkbox" id="bulkIgnoreBR" checked> Ignorar IPs brasileiros
+            </label>
+            <label class="checkbox-label" style="margin: 0;">
+              <input type="checkbox" id="bulkAutoAbuse" checked> Consultar AbuseIPDB automaticamente
+            </label>
+            <div style="margin-top: 8px;">
+              <label>Protection Name padrão</label>
+              <select id="bulkAttackSelect" style="margin-top: 4px;">
+                <option value="">Carregando ataques...</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px;">
+        <button class="btn btn-cyan" id="btnBulk" onclick="processarListaIPs()">▶ Processar Lista</button>
+        <button class="btn btn-abort hidden" id="btnBulkAbort" onclick="abortarBulk()">■ Parar</button>
+        <button class="btn btn-sm" onclick="limparBulk()">✕ Limpar</button>
+        <span id="bulkStatus" style="font-size: 12px; color: var(--text-secondary); font-family: 'JetBrains Mono', monospace;"></span>
+      </div>
+
+      <!-- PROGRESS BULK -->
+      <div id="bulkProgress" class="hidden" style="margin-bottom: 12px;">
+        <div class="progress-header">
+          <span style="color: var(--accent-cyan);"><span class="spinner"></span>&nbsp; Consultando AbuseIPDB...</span>
+          <span id="bulkPct" style="color: var(--accent-blue);">0%</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" id="bulkProgressFill" style="width: 0%"></div></div>
+        <div class="progress-ip" id="bulkProgressLabel">Aguardando...</div>
+      </div>
+
+      <!-- BULK RESULTS -->
+      <div id="bulkResultsSection" class="hidden">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <span style="font-size: 12px; color: var(--text-secondary);" id="bulkResultCount">0 IPs processados</span>
+          <button class="btn btn-green btn-sm" onclick="adicionarTodosBulk()">➕ Adicionar todos à lista</button>
+        </div>
+        <div class="ocr-results-list" id="bulkResultsList"></div>
+      </div>
+    </div>
+
+  </div>
+
+
+  <!-- ════════════════════════════════════════════ -->
+  <!-- SEÇÃO 3 — LISTA CONSOLIDADA                 -->
+  <!-- ════════════════════════════════════════════ -->
+  <div class="section-title">
+    <span class="section-num">3</span>
+    Lista de IPs para Bloqueio
+  </div>
+
+  <!-- METRICS -->
+  <div class="metrics-grid">
+    <div class="metric-card blue">
+      <div class="metric-label">Total IPs</div>
+      <div class="metric-value" id="metTotal">0</div>
+      <div class="metric-sub">na lista</div>
+    </div>
+    <div class="metric-card red">
+      <div class="metric-label">Alto risco</div>
+      <div class="metric-value" id="metHigh">0</div>
+      <div class="metric-sub">acima de 50%</div>
+    </div>
+    <div class="metric-card cyan">
+      <div class="metric-label">Brasileiros</div>
+      <div class="metric-value" id="metBR">0</div>
+      <div class="metric-sub">excluídos</div>
+    </div>
+    <div class="metric-card green">
+      <div class="metric-label">Para bloquear</div>
+      <div class="metric-value" id="metBlock">0</div>
+      <div class="metric-sub">comandos</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <!-- PROTECTED NETWORKS WARNING -->
+    <div class="protected-warning">
+      <span style="font-size:18px;flex-shrink:0;">⚠️</span>
+      <div>
+        <strong>Redes protegidas — NÃO BLOQUEAR</strong>
+        IPs das redes abaixo são identificados automaticamente e bloqueados de serem adicionados à lista.<br>
+        <span style="color:var(--text-secondary);font-size:11px;">
+          Akamai/CDN: 184.24.0.0/13 · 2.16.0.0/13 · 23.0.0.0/12 · 23.192.0.0/11 · 23.32.0.0/11 · 95.100.0.0/15
+          &nbsp;|&nbsp; Internas: 10.0.0.0/8 · 172.16.0.0/12
+        </span>
+      </div>
+    </div>
+    <!-- FILTER BAR -->
+    <div class="filter-row" style="margin-bottom: 12px;">
+      <label class="checkbox-label">
+        <input type="checkbox" id="filterBRList" onchange="renderList()"> Ocultar brasileiros
+      </label>
+      <div class="divider"></div>
+      <label class="checkbox-label">
+        <input type="checkbox" id="filterLowList" onchange="renderList()"> Ocultar &lt;10% abuso
+      </label>
+      <div class="divider"></div>
+      <div class="divider"></div>
+      <select id="sortList" onchange="renderList()" style="height:32px;font-size:12px;width:auto;padding:4px 10px;">
+        <option value="abuse">↓ Ordenar por abuso</option>
+        <option value="reports">↓ Ordenar por reports</option>
+        <option value="ip">↑ Ordenar por IP</option>
+        <option value="country">↑ Ordenar por país</option>
+      </select>
+      <div class="divider"></div>
+      <button class="btn btn-red btn-sm" onclick="limparLista()">🗑 Limpar lista</button>
+    </div>
+
+    <!-- TABS -->
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab3('tabList')">📋 Lista</button>
+      <button class="tab" onclick="switchTab3('tabCmds')">⚙️ Comandos Check Point</button>
+      <button class="tab" onclick="switchTab3('tabIPs')">📄 Somente IPs</button>
+    </div>
+
+    <!-- TAB: LISTA -->
+    <div id="tabList">
+      <div class="list-header">
+        <span>#</span>
+        <span>IP</span>
+        <span>País</span>
+        <span>Cidade</span>
+        <span>ISP</span>
+        <span>Abuso</span>
+        <span>Reports</span>
+        <span>Protection Name</span>
+        <span></span>
+      </div>
+      <div id="ipListContainer">
+        <div class="empty-list">Nenhum IP adicionado ainda.<br>Use as seções acima para adicionar IPs.</div>
+      </div>
+    </div>
+
+    <!-- TAB: COMANDOS -->
+    <div id="tabCmds" class="hidden">
+      <div class="output-header">
+        <div>
+          <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 2px;">Comandos prontos — IPs brasileiros excluídos automaticamente</div>
+          <div class="output-label" id="cmdCount">0 comandos</div>
+        </div>
+        <button class="btn btn-sm" onclick="copiarOutput('cmdsOutput', this)">📋 Copiar tudo</button>
+      </div>
+      <div class="output-area" id="cmdsOutput"></div>
+    </div>
+
+    <!-- TAB: IPs -->
+    <div id="tabIPs" class="hidden">
+      <div class="output-header">
+        <div>
+          <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 2px;">IPs para bloqueio — sem brasileiros</div>
+          <div class="output-label" id="ipCount">0 IPs</div>
+        </div>
+        <button class="btn btn-sm" onclick="copiarOutput('ipsOutput', this)">📋 Copiar lista</button>
+      </div>
+      <div class="output-area" id="ipsOutput"></div>
+    </div>
+
+  </div>
+
+
+  <!-- ════════════════════════════════════════════ -->
+  <!-- SEÇÃO 4 — CALCULADORA DE SUB-REDE           -->
+  <!-- ════════════════════════════════════════════ -->
+  <div class="section-title">
+    <span class="section-num">4</span>
+    Calculadora de Sub-rede IPv4
+  </div>
+
+  <div class="card">
+    <div class="card-corner">SUBNET CALC</div>
+
+    <!-- INPUTS -->
+    <div class="subnet-grid" style="margin-bottom:1rem;">
+      <div class="subnet-field">
+        <label>Bloco de endereço (CIDR)</label>
+        <input type="text" id="subnetInput" placeholder="Ex: 192.168.1.0/24"
+          oninput="calcSubnet()" style="font-family:'JetBrains Mono',monospace;font-size:13px;" />
+      </div>
+      <div class="subnet-field">
+        <label>Máscara de sub-rede</label>
+        <div class="subnet-output" id="sub-mask">—</div>
+      </div>
+      <div class="subnet-field">
+        <label>Máscara curinga (Cisco)</label>
+        <div class="subnet-output" id="sub-wildcard">—</div>
+      </div>
+      <div class="subnet-field">
+        <label>Notação CIDR</label>
+        <div class="subnet-output" id="sub-cidr">—</div>
+      </div>
+    </div>
+
+    <!-- INFO GRID -->
+    <div class="subnet-info-grid">
+      <div class="subnet-info-item">
+        <div class="subnet-info-label">Endereço de rede</div>
+        <div class="subnet-info-value" id="sub-network">—</div>
+      </div>
+      <div class="subnet-info-item">
+        <div class="subnet-info-label">Endereço de broadcast</div>
+        <div class="subnet-info-value" id="sub-broadcast">—</div>
+      </div>
+      <div class="subnet-info-item">
+        <div class="subnet-info-label">Intervalo de hosts</div>
+        <div class="subnet-info-value" id="sub-range" style="font-size:11px;">—</div>
+      </div>
+      <div class="subnet-info-item">
+        <div class="subnet-info-label">Total de hosts utilizáveis</div>
+        <div class="subnet-info-value" id="sub-hosts">—</div>
+      </div>
+      <div class="subnet-info-item">
+        <div class="subnet-info-label">Classe</div>
+        <div class="subnet-info-value" id="sub-class">—</div>
+      </div>
+      <div class="subnet-info-item">
+        <div class="subnet-info-label">Tipo</div>
+        <div class="subnet-info-value" id="sub-type">—</div>
+      </div>
+      <div class="subnet-info-item">
+        <div class="subnet-info-label">Bits de rede / host</div>
+        <div class="subnet-info-value" id="sub-bits">—</div>
+      </div>
+      <div class="subnet-info-item">
+        <div class="subnet-info-label">Binário da máscara</div>
+        <div class="subnet-info-value" id="sub-binary" style="font-size:10px;letter-spacing:0.05em;">—</div>
+      </div>
+    </div>
+
+    <!-- DIVISOR -->
+    <div style="border-top:1px solid var(--border);margin:1rem 0;"></div>
+
+    <!-- DETALHES DE SUB-REDES -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+      <span style="font-size:11px;font-weight:600;color:var(--accent-cyan);text-transform:uppercase;letter-spacing:0.1em;">Detalhes das sub-redes</span>
+      <div
+            style="
+              display: flex;
+              gap: 8px;
+              align-items: center;
+              flex-wrap: wrap;
+            "
+          >
+            <label
+              style="
+                font-size: 11px;
+                color: var(--text-secondary);
+                text-transform: none;
+                letter-spacing: 0;
+              "
+              >Dividir em /<input
+                type="number"
+                id="subnetDivide"
+                min="1"
+                max="32"
+                value=""
+                placeholder="ex: 26"
+                style="
+                  width: 60px;
+                  margin-left: 6px;
+                  height: 28px;
+                  font-size: 12px;
+                  padding: 0 8px;
+                  border-radius: 6px;
+                "
+                oninput="calcSubnet()"
+            /></label>
+          </div>
+    </div>
+
+    <div style="overflow-x:auto;margin-bottom:1rem;">
+      <table class="subnet-details-table">
+        <thead>
+          <tr>
+            <th>Subnet ID</th>
+            <th>Subnet Address</th>
+            <th>Host Address Range</th>
+            <th>Broadcast Address</th>
+            <th>Hosts utilizáveis</th>
+          </tr>
+        </thead>
+        <tbody id="subnetTableBody">
+          <tr><td colspan="5" style="text-align:center;color:var(--text-secondary);padding:1.5rem;">
+            Digite um bloco CIDR acima para calcular as sub-redes.
+          </td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- COMANDOS CHECK POINT -->
+    <div style="border-top:1px solid var(--border);margin:1rem 0;"></div>
+    <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:12px;">
+      <div style="flex:1;min-width:180px;">
+        <label>Grupo Check Point</label>
+        <input type="text" id="subnetGroup" style="height:36px;font-size:12px;" />
+      </div>
+      <div style="flex:2;min-width:240px;">
+        <label>Protection Name / Ataque</label>
+        <select id="subnetAttackSelect" style="height:36px;font-size:12px;">
+          <option value="Atividade Suspeita">Atividade Suspeita</option>
+        </select>
+      </div>
+      <div>
+        <button class="btn btn-cyan btn-sm" style="height:36px;" onclick="gerarComandosSubnet()">⚙️ Gerar comandos Check Point</button>
+      </div>
+      <div>
+        <button class="btn btn-sm" style="height:36px;" onclick="copiarSubnetCmds(this)">📋 Copiar</button>
+      </div>
+    </div>
+
+    <div id="subnetCmdsSection" class="hidden">
+      <div class="output-header" style="margin-bottom:8px;">
+        <span style="font-size:11px;font-weight:600;color:var(--accent-cyan);text-transform:uppercase;letter-spacing:0.1em;">Comandos gerados</span>
+        <div class="output-label" id="subnetCmdCount">0 comandos</div>
+      </div>
+      <div class="subnet-block-cmd" id="subnetCmdsOutput"></div>
+    </div>
+
+  </div>
+
+</div><!-- /main -->
+
+<script>
+// ══════════════════════════════════════
+// ESTADO GLOBAL
+// ══════════════════════════════════════
+const SERVER = 'http://127.0.0.1:5000';
+
+// Gera "Bloqueios <Mes> <Ano>" automaticamente com o mes/ano atual
+function gerarGrupoAtual() {
+  const meses = [
+    'Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+    'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'
+  ];
+  const now = new Date();
+  return `Bloqueios ${meses[now.getMonth()]} ${now.getFullYear()}`;
+}
+
+// Preenche o campo ao carregar a pagina
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('groupName').value = gerarGrupoAtual();
+});
+let ipList = []; // {id, ip, country, countryName, isp, abuse, reports, usageType, isBR, protection}
+let singleData = null;
+let ocrResults = [];
+let idCounter = 0;
+
+// ══════════════════════════════════════
+// REDES PROTEGIDAS — NÃO BLOQUEAR
+// ══════════════════════════════════════
+const PROTECTED_NETWORKS = [
+  // ── Akamai Site Shield / CDN (atualizado) ──
+  { cidr: '184.24.0.0/13',  label: 'Akamai CDN', type: 'akamai' },
+  { cidr: '2.16.0.0/13',    label: 'Akamai CDN', type: 'akamai' },
+  { cidr: '23.0.0.0/12',    label: 'Akamai CDN', type: 'akamai' },
+  { cidr: '23.192.0.0/11',  label: 'Akamai CDN', type: 'akamai' },
+  { cidr: '23.32.0.0/11',   label: 'Akamai CDN', type: 'akamai' },
+  { cidr: '95.100.0.0/15',  label: 'Akamai CDN', type: 'akamai' },
+  // ── Redes Internas ──
+  { cidr: '10.0.0.0/8',     label: 'Rede Interna', type: 'internal' },
+  { cidr: '192.168.0.0/16', label: 'Rede Interna', type: 'internal' },
+  { cidr: '172.16.0.0/12',  label: 'Rede Interna', type: 'internal' },
+];
+
+// Convert IP string to 32-bit integer
+function ipToInt(ip) {
+  return ip.split('.').reduce((acc, oct) => (acc << 8) + parseInt(oct), 0) >>> 0;
+}
+
+// Check if IP belongs to a CIDR block
+function ipInCidr(ip, cidr) {
+  const [net, bits] = cidr.split('/');
+  const mask = bits === '32' ? 0xFFFFFFFF : (~(0xFFFFFFFF >>> parseInt(bits))) >>> 0;
+  return (ipToInt(ip) & mask) === (ipToInt(net) & mask);
+}
+
+// Returns protection info if IP is in a protected network, or null
+function checkProtectedNetwork(ip) {
+  for (const net of PROTECTED_NETWORKS) {
+    try {
+      if (ipInCidr(ip, net.cidr)) return net;
+    } catch { continue; }
+  }
+  return null;
+}
+
+const countryFlags = {
+  BR:'🇧🇷',US:'🇺🇸',CN:'🇨🇳',RU:'🇷🇺',DE:'🇩🇪',GB:'🇬🇧',FR:'🇫🇷',IN:'🇮🇳',
+  PK:'🇵🇰',NL:'🇳🇱',CA:'🇨🇦',AU:'🇦🇺',JP:'🇯🇵',KR:'🇰🇷',UA:'🇺🇦',ES:'🇪🇸',
+  IT:'🇮🇹',MX:'🇲🇽',AR:'🇦🇷',CL:'🇨🇱',CO:'🇨🇴',VN:'🇻🇳',ID:'🇮🇩',TH:'🇹🇭',
+  TW:'🇹🇼',HK:'🇭🇰',SG:'🇸🇬',PL:'🇵🇱',RO:'🇷🇴',CZ:'🇨🇿',PT:'🇵🇹',
+  SE:'🇸🇪',NO:'🇳🇴',FI:'🇫🇮',DK:'🇩🇰',CH:'🇨🇭',AT:'🇦🇹',BE:'🇧🇪',TR:'🇹🇷',
+  IR:'🇮🇷',SA:'🇸🇦',EG:'🇪🇬',ZA:'🇿🇦',NG:'🇳🇬',KE:'🇰🇪',MA:'🇲🇦',
+  BD:'🇧🇩',LK:'🇱🇰',PH:'🇵🇭',MY:'🇲🇾',AM:'🇦🇲',GE:'🇬🇪',IL:'🇮🇱',
+  SK:'🇸🇰',HU:'🇭🇺',RS:'🇷🇸',BG:'🇧🇬',HR:'🇭🇷',UA:'🇺🇦',MK:'🇲🇰',
+  LV:'🇱🇻',LT:'🇱🇹',EE:'🇪🇪',AZ:'🇦🇿',KZ:'🇰🇿',UZ:'🇺🇿',VE:'🇻🇪',PE:'🇵🇪',
+  EC:'🇪🇨',BO:'🇧🇴',PY:'🇵🇾',UY:'🇺🇾',GT:'🇬🇹',CR:'🇨🇷',PA:'🇵🇦',CU:'🇨🇺',
+  DO:'🇩🇴',HN:'🇭🇳',SV:'🇸🇻',NI:'🇳🇮',JM:'🇯🇲',HT:'🇭🇹',TT:'🇹🇹',
+};
+
+// ══════════════════════════════════════
+// CLOCK & SERVER STATUS
+// ══════════════════════════════════════
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clockDisplay').textContent =
+    now.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+async function checkServer() {
+  try {
+    const r = await fetch(`${SERVER}/attacks`);
+    if (r.ok) {
+      document.getElementById('serverStatus').textContent = 'online';
+      document.getElementById('serverStatus').style.color = 'var(--accent-green)';
+    }
+  } catch {
+    document.getElementById('serverStatus').textContent = 'offline';
+    document.getElementById('serverStatus').style.color = 'var(--accent-red)';
+  }
+}
+checkServer();
+
+// ══════════════════════════════════════
+// ATTACKS LIST
+// ══════════════════════════════════════
+async function loadAttacks() {
+  try {
+    const r = await fetch(`${SERVER}/attacks`);
+    const attacks = await r.json();
+    const sel = document.getElementById('attackSelect');
+    sel.innerHTML = attacks.map(a => `<option value="${escHtml(a)}">${escHtml(a)}</option>`).join('');
+    // Also populate bulk select
+    const sel2 = document.getElementById('bulkAttackSelect');
+    if (sel2) sel2.innerHTML = attacks.map(a => `<option value="${escHtml(a)}">${escHtml(a)}</option>`).join('');
+    const sel3 = document.getElementById('subnetAttackSelect');
+    if (sel3) sel3.innerHTML = attacks.map(a => `<option value="${escHtml(a)}">${escHtml(a)}</option>`).join('');
+    const sel4 = document.getElementById('ocrIpsOnlySelect');
+    if (sel4) sel4.innerHTML = attacks.map(a => `<option value="${escHtml(a)}">${escHtml(a)}</option>`).join('');
+  } catch {
+    document.getElementById('attackSelect').innerHTML = '<option value="Atividade Suspeita">Atividade Suspeita</option>';
+    const s2 = document.getElementById('bulkAttackSelect');
+    if (s2) s2.innerHTML = '<option value="Atividade Suspeita">Atividade Suspeita</option>';
+    const s3 = document.getElementById('subnetAttackSelect');
+    if (s3) s3.innerHTML = '<option value="Atividade Suspeita">Atividade Suspeita</option>';
+    const s4 = document.getElementById('ocrIpsOnlySelect');
+    if (s4) s4.innerHTML = '<option value="Atividade Suspeita">Atividade Suspeita</option>';
+  }
+}
+loadAttacks();
+
+// ══════════════════════════════════════
+// SEÇÃO 2 — SUB-TABS
+// ══════════════════════════════════════
+function switchSec2(tab) {
+  document.getElementById('sec2PanelImg').classList.toggle('hidden', tab !== 'img');
+  document.getElementById('sec2PanelList').classList.toggle('hidden', tab !== 'list');
+  document.getElementById('sec2TabImg').classList.toggle('active', tab === 'img');
+  document.getElementById('sec2TabList').classList.toggle('active', tab === 'list');
+}
+
+// ── BULK: carregar arquivo .txt ──
+function loadIPFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('ipBulkInput').value = e.target.result;
+    document.getElementById('ipBulkFileStatus').textContent = `✓ ${file.name} carregado`;
+  };
+  reader.readAsText(file);
+}
+
+// ── BULK: parse IPs from textarea ──
+function parseBulkIPs(text) {
+  return [...new Set(
+    text.split(/[\n,;\s]+/)
+      .map(s => s.trim())
+      .filter(s => /^\d{1,3}(\.\d{1,3}){3}$/.test(s))
+      .filter(s => s.split('.').map(Number).every(p => p >= 0 && p <= 255))
+  )];
+}
+
+let bulkAbortFlag = false;
+let bulkResults = [];
+
+async function processarListaIPs() {
+  const text = document.getElementById('ipBulkInput').value;
+  const ips = parseBulkIPs(text);
+
+  if (ips.length === 0) {
+    alert('Nenhum IP válido encontrado. Cole os IPs um por linha.');
+    return;
+  }
+
+  bulkAbortFlag = false;
+  bulkResults = [];
+
+  document.getElementById('btnBulk').classList.add('hidden');
+  document.getElementById('btnBulkAbort').classList.remove('hidden');
+  document.getElementById('bulkProgress').classList.remove('hidden');
+  document.getElementById('bulkResultsSection').classList.add('hidden');
+  document.getElementById('bulkStatus').textContent = `${ips.length} IPs encontrados`;
+
+  const autoAbuse = document.getElementById('bulkAutoAbuse').checked;
+  const ignoreBR  = document.getElementById('bulkIgnoreBR').checked;
+  const attack    = document.getElementById('bulkAttackSelect').value || 'Atividade Suspeita';
+
+  for (let i = 0; i < ips.length; i++) {
+    if (bulkAbortFlag) break;
+
+    const ip = ips[i];
+    const pct = Math.round(((i + 1) / ips.length) * 100);
+    document.getElementById('bulkProgressFill').style.width = pct + '%';
+    document.getElementById('bulkPct').textContent = pct + '%';
+    document.getElementById('bulkProgressLabel').textContent = `[${i+1}/${ips.length}] ${ip}`;
+
+    const item = { ip, country: '??', countryName: 'Unknown', isp: 'Não consultado',
+                   abuse: 0, reports: 0, usageType: 'Unknown', isBR: false,
+                   domain: '', protection: attack };
+
+    if (autoAbuse) {
+      try {
+        const r = await fetch(`${SERVER}/check_ip?ip=${encodeURIComponent(ip)}`);
+        const json = await r.json();
+        const d = json.data || {};
+        item.country     = d.countryCode    || '??';
+        item.countryName = d.countryName    || 'Unknown';
+        item.isp         = d.isp            || 'Unknown';
+        item.abuse       = d.abuseConfidenceScore || 0;
+        item.reports     = d.totalReports   || 0;
+        item.usageType   = d.usageType      || 'Unknown';
+        item.isBR        = d.countryCode === 'BR';
+        item.domain      = d.domain         || '';
+        item.city        = d.city           || '';
+        item.region      = d.region         || '';
+        item.asn         = d.asn            || '';
+      } catch {
+        item.isp = 'Erro na consulta';
+      }
+      // Enriquece com ipinfo.io se city ou asn estiver vazio
+      if (!item.city || !item.asn) {
+        try {
+          const ri = await fetch(`${SERVER}/check_ipinfo?ip=${encodeURIComponent(ip)}`);
+          if (ri.ok) {
+            const ji = await ri.json();
+            if (!item.city    && ji.city)    item.city    = ji.city;
+            if (!item.region  && ji.region)  item.region  = ji.region;
+            if (!item.asn     && ji.asn)     item.asn     = ji.asn;
+            if (!item.asnName && ji.asnName) item.asnName = ji.asnName;
+          }
+        } catch(e) {
+          console.warn('[ipinfo bulk] Falha:', e.message);
+        }
+      }
+      await new Promise(res => setTimeout(res, 250));
+    }
+
+    if (ignoreBR && item.isBR) continue;
+    bulkResults.push(item);
+  }
+
+  document.getElementById('btnBulk').classList.remove('hidden');
+  document.getElementById('btnBulkAbort').classList.add('hidden');
+  document.getElementById('bulkProgress').classList.add('hidden');
+  document.getElementById('bulkResultsSection').classList.remove('hidden');
+  document.getElementById('bulkResultCount').textContent = `${bulkResults.length} IPs processados`;
+  document.getElementById('bulkStatus').textContent = `✓ ${bulkResults.length} IPs prontos`;
+
+  renderBulkResults();
+}
+
+function abortarBulk() {
+  bulkAbortFlag = true;
+  document.getElementById('btnBulkAbort').classList.add('hidden');
+  document.getElementById('btnBulk').classList.remove('hidden');
+  document.getElementById('bulkStatus').textContent = '⚠ Processamento interrompido';
+}
+
+function renderBulkResults() {
+  const container = document.getElementById('bulkResultsList');
+  if (bulkResults.length === 0) {
+    container.innerHTML = '<div style="text-align:center;color:var(--text-secondary);padding:1rem;font-size:13px;">Nenhum IP para exibir.</div>';
+    return;
+  }
+  container.innerHTML = bulkResults.map((item, i) => {
+    const flag = countryFlags[item.country] || '';
+    const protNet = checkProtectedNetwork(item.ip);
+    const bc = protNet
+      ? (protNet.type === 'akamai' ? 'badge-akamai' : 'badge-internal')
+      : item.isBR ? 'badge-br'
+      : item.abuse > 50 ? 'badge-high' : item.abuse > 20 ? 'badge-mid' : 'badge-low';
+    const abuseStr = protNet ? `🛡 ${protNet.label}` : `${item.abuse}%`;
+    const btn = protNet
+      ? `<span style="font-size:11px;color:#f59e0b;">⚠ Protegido</span>`
+      : `<button class="btn btn-green btn-xs" onclick="adicionarBulkItem(${i})">+ Lista</button>`;
+    return `<div class="ocr-item" style="${protNet ? 'border-color:rgba(245,158,11,0.3);' : ''}">
+      <span class="ocr-item-ip">${item.ip}</span>
+      <span style="color:var(--text-secondary);font-size:11px;min-width:60px;">${flag} ${item.country}</span>
+      <span class="badge ${bc}" style="min-width:52px;">${abuseStr}</span>
+      <span class="ocr-item-prot" title="${escHtml(item.protection)}">${escHtml(item.protection)}</span>
+      ${btn}
+    </div>`;
+  }).join('');
+}
+
+function adicionarBulkItem(idx) {
+  const item = bulkResults[idx];
+  if (!item) return;
+  const protNet = checkProtectedNetwork(item.ip);
+  if (protNet) {
+    alert(`⚠ ATENÇÃO: ${item.ip} pertence à rede protegida:\n${protNet.label} (${protNet.cidr})\nNÃO deve ser bloqueado!`);
+    return;
+  }
+  if (ipList.find(x => x.ip === item.ip)) { alert('IP já está na lista.'); return; }
+  ipList.push({ id: ++idCounter, ...item });
+  renderList();
+  updateMetrics();
+}
+
+function adicionarTodosBulk() {
+  let added = 0; let skipped = 0;
+  for (const item of bulkResults) {
+    if (checkProtectedNetwork(item.ip)) { skipped++; continue; }
+    if (!ipList.find(x => x.ip === item.ip)) {
+      ipList.push({ id: ++idCounter, ...item });
+      added++;
+    }
+  }
+  renderList();
+  updateMetrics();
+  const msg = skipped > 0
+    ? `✓ ${added} adicionados — ⚠ ${skipped} protegidos ignorados`
+    : `✓ ${added} IPs adicionados à lista`;
+  document.getElementById('bulkStatus').textContent = msg;
+}
+
+function limparBulk() {
+  bulkResults = [];
+  bulkAbortFlag = false;
+  document.getElementById('ipBulkInput').value = '';
+  document.getElementById('bulkResultsSection').classList.add('hidden');
+  document.getElementById('bulkProgress').classList.add('hidden');
+  document.getElementById('bulkStatus').textContent = '';
+  document.getElementById('ipBulkFileStatus').textContent = '';
+  document.getElementById('ipBulkFile').value = '';
+}
+
+function toggleAddAttack() {
+  document.getElementById('addAttackRow').classList.toggle('hidden');
+  if (!document.getElementById('addAttackRow').classList.contains('hidden')) {
+    document.getElementById('newAttackInput').focus();
+  }
+}
+
+async function saveNewAttack() {
+  const val = document.getElementById('newAttackInput').value.trim();
+  if (!val) return;
+  try {
+    const r = await fetch(`${SERVER}/attacks`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({attack: val})
+    });
+    const data = await r.json();
+    if (data.attacks) {
+      const sel = document.getElementById('attackSelect');
+      sel.innerHTML = data.attacks.map(a => `<option value="${escHtml(a)}">${escHtml(a)}</option>`).join('');
+      sel.value = val;
+    }
+    document.getElementById('newAttackInput').value = '';
+    document.getElementById('addAttackRow').classList.add('hidden');
+  } catch(e) {
+    alert('Erro ao salvar ataque: ' + e.message);
+  }
+}
+
+// ══════════════════════════════════════
+// SEÇÃO 1 — IP ÚNICO
+// ══════════════════════════════════════
+async function consultarSingle() {
+  const ip = document.getElementById('singleIP').value.trim();
+  if (!ip || !/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) {
+    alert('Digite um IP válido.');
+    return;
+  }
+
+  const attack = document.getElementById('attackSelect').value || 'Atividade Suspeita';
+  const group  = document.getElementById('groupName').value  || gerarGrupoAtual();
+
+  document.getElementById('singleStatus').textContent = 'Consultando...';
+  document.getElementById('btnSingle').disabled = true;
+  document.getElementById('singleResult').style.display = 'none';
+  singleData = null;
+
+  // Monta dados base — funciona offline
+  singleData = {
+    id: ++idCounter,
+    ip: ip,
+    country: '??', countryName: 'Sem dados',
+    isp: '—', abuse: 0, reports: 0,
+    usageType: '—', isBR: false, domain: '—',
+    protection: attack, offline: true
+  };
+
+  let consultaOK = false;
+
+  try {
+    const r = await fetch(`${SERVER}/check_ip?ip=${encodeURIComponent(ip)}`);
+    // Só processa se retornou 200 — status 500/timeout não lança exceção mas não tem dados
+    if (r.ok) {
+      const json = await r.json();
+      const d = json.data || {};
+      if (d.ipAddress || d.abuseConfidenceScore !== undefined) {
+        singleData.country     = d.countryCode           || '??';
+        singleData.countryName = d.countryName           || 'Unknown';
+        singleData.isp         = d.isp                   || 'Unknown';
+        singleData.abuse       = d.abuseConfidenceScore  || 0;
+        singleData.reports     = d.totalReports          || 0;
+        singleData.users       = d.numDistinctUsers      || 0;
+        singleData.lastReport  = d.lastReportedAt        || null;
+        singleData.usageType   = d.usageType             || 'Unknown';
+        singleData.isBR        = d.countryCode === 'BR';
+        singleData.domain      = d.domain                || '—';
+        singleData.city        = d.city                  || '';
+        singleData.region      = d.region                || '';
+        singleData.asn         = d.asn                   || '';
+        singleData.asnName     = d.asnName               || '';
+        singleData.offline     = false;
+        consultaOK = true;
+      }
+    } else {
+      console.warn(`[consultarSingle] Servidor retornou ${r.status} — usando dados locais`);
+    }
+  } catch(e) {
+    // Servidor offline, rede indisponível ou CORS — continua com dados locais
+    console.warn('[consultarSingle] Sem conexão:', e.message);
+  }
+
+  // Enriquece com ipinfo.io se city ou asn estiver vazio após AbuseIPDB
+  if (!singleData.city || !singleData.asn) {
+    try {
+      const ri = await fetch(`${SERVER}/check_ipinfo?ip=${encodeURIComponent(ip)}`);
+      if (ri.ok) {
+        const ji = await ri.json();
+        if (!singleData.city    && ji.city)    singleData.city    = ji.city;
+        if (!singleData.region  && ji.region)  singleData.region  = ji.region;
+        if (!singleData.asn     && ji.asn)     singleData.asn     = ji.asn;
+        if (!singleData.asnName && ji.asnName) singleData.asnName = ji.asnName;
+      }
+    } catch(e) {
+      console.warn('[ipinfo single] Falha:', e.message);
+    }
+  }
+
+  // Renderiza card (com ou sem dados do AbuseIPDB)
+  const { country, countryName, isp, abuse, reports, usageType, domain, isBR, offline } = singleData;
+  const flag = countryFlags[country] || '';
+  const protNet = checkProtectedNetwork(ip);
+  singleData.protectedNet = protNet || null;
+
+  document.getElementById('r-ip').textContent = ip;
+  document.getElementById('r-country').textContent = consultaOK
+    ? `${flag} ${country} — ${countryName}`
+    : '— (sem consulta)';
+  document.getElementById('r-city').textContent = singleData.city
+    ? `${singleData.city}${singleData.region ? ', ' + singleData.region : ''}`
+    : '—';
+  document.getElementById('r-isp').textContent = isp;
+  document.getElementById('r-abuse').innerHTML = consultaOK
+    ? `<span class="badge ${abuse > 50 ? 'badge-high' : abuse > 20 ? 'badge-mid' : 'badge-low'}">${abuse}%</span>`
+    : `<span class="badge badge-low" style="color:var(--text-secondary);">—</span>`;
+  document.getElementById('r-reports').textContent = consultaOK ? reports : '—';
+  document.getElementById('r-users').textContent   = consultaOK ? (singleData.users || '—') : '—';
+  document.getElementById('r-last').textContent    = consultaOK && singleData.lastReport
+    ? new Date(singleData.lastReport).toLocaleString('pt-BR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})
+    : '—';
+  document.getElementById('r-type').textContent   = usageType;
+  if (document.getElementById('r-asn')) {
+    document.getElementById('r-asn').textContent = singleData.asn
+      ? singleData.asn + (singleData.asnName ? ' — ' + singleData.asnName : '')
+      : '—';
+  }
+  document.getElementById('r-domain').textContent = domain;
+  document.getElementById('r-status').innerHTML   = protNet
+    ? `<span style="color:#f59e0b;font-size:11px;">🛡 ${protNet.label} — NÃO BLOQUEAR</span>`
+    : isBR
+      ? '<span class="status-br">🇧🇷 Brasil</span>'
+      : abuse > 50
+        ? '<span class="status-risk">⚠ Alto risco</span>'
+        : '<span class="status-block">✓ Bloquear</span>';
+
+  // Comando gerado SEMPRE, independente da consulta
+  document.getElementById('r-cmd').textContent =
+    `add host name "Host_${ip}" ip-address "${ip}" groups.1 "${group}" comments "Host responsavel por ${attack}"`;
+
+  document.getElementById('singleResult').style.display = 'block';
+  document.getElementById('singleStatus').textContent = consultaOK
+    ? '✓ Consulta concluída'
+    : '⚠ Offline — comando gerado sem dados do AbuseIPDB';
+  document.getElementById('singleStatus').style.color = consultaOK
+    ? 'var(--accent-green)'
+    : 'var(--accent-yellow)';
+
+  document.getElementById('btnSingle').disabled = false;
+}
+
+function adicionarSingleNaLista() {
+  if (!singleData) return;
+  const protNet = checkProtectedNetwork(singleData.ip);
+  if (protNet) {
+    alert(`⚠ ATENÇÃO: O IP ${singleData.ip} pertence à rede protegida:\n${protNet.label} (${protNet.cidr})\n\nEste IP NÃO deve ser bloqueado!`);
+    return;
+  }
+  if (ipList.find(x => x.ip === singleData.ip)) {
+    alert('Este IP já está na lista.');
+    return;
+  }
+  ipList.push({...singleData});
+  renderList();
+  updateMetrics();
+  document.getElementById('singleStatus').textContent = '✓ IP adicionado à lista';
+}
+
+function copiarCmd(btn) {
+  const txt = document.getElementById('r-cmd').textContent;
+
+  navigator.clipboard.writeText(txt).then(() => {
+    const orig = btn.textContent;
+
+    btn.textContent = '✓ Copiado!';
+    btn.style.color = 'var(--accent-green)';
+
+    setTimeout(() => {
+      btn.textContent = orig;
+      btn.style.color = '';
+    }, 2000);
+
+  }).catch(() => {
+    console.warn("Falha ao copiar");
+  });
+}
+
+// ══════════════════════════════════════
+// SEÇÃO 2 — OCR / PRINT
+// ══════════════════════════════════════
+let selectedFile = null;
+
+function handleFileSelect(input) {
+  const file = input.files[0];
+  if (file) { selectedFile = file; showPreview(file); }
+}
+
+function showPreview(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = document.getElementById('imgPreview');
+    img.src = e.target.result;
+    img.style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+
+// Drag and drop
+const dz = document.getElementById('dropzone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('image/')) { selectedFile = file; showPreview(file); }
+});
+
+// Paste from clipboard (Ctrl+V)
+document.addEventListener('paste', e => {
+  const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+  for (const item of items) {
+    if (item.kind === 'file' && item.type.startsWith('image/')) {
+      const file = item.getAsFile();
+      selectedFile = file;
+      showPreview(file);
+      document.getElementById('ocrStatus').textContent = '✓ Imagem colada do clipboard';
+      break;
+    }
+  }
+});
+
+async function extrairDoprint() {
+  if (!selectedFile) {
+    alert('Selecione, arraste ou cole (Ctrl+V) uma imagem primeiro.');
+    return;
+  }
+
+  document.getElementById('ocrProgress').classList.remove('hidden');
+  document.getElementById('ocrResultsSection').classList.add('hidden');
+  document.getElementById('btnExtract').disabled = true;
+  document.getElementById('ocrStatus').textContent = 'Enviando imagem...';
+  document.getElementById('ocrProgressFill').style.width = '20%';
+  document.getElementById('ocrPct').textContent = '20%';
+  document.getElementById('ocrProgressLabel').textContent = 'Enviando ao servidor OCR...';
+
+  const formData = new FormData();
+  formData.append('image', selectedFile);
+
+  // Envia o modo selecionado pelo usuário ao servidor
+  const ocrMode = document.querySelector('input[name="ocrMode"]:checked')?.value || 'full';
+  formData.append('mode', ocrMode);
+
+  try {
+    const r = await fetch(`${SERVER}/extract_image`, { method: 'POST', body: formData });
+    document.getElementById('ocrProgressFill').style.width = '60%';
+    document.getElementById('ocrPct').textContent = '60%';
+    document.getElementById('ocrProgressLabel').textContent = 'Processando OCR...';
+
+    const data = await r.json();
+
+    if (data.error) {
+      document.getElementById('ocrStatus').textContent = '✗ ' + data.error;
+      document.getElementById('ocrProgress').classList.add('hidden');
+      document.getElementById('btnExtract').disabled = false;
+      return;
+    }
+
+    ocrResults = data;
+    document.getElementById('ocrProgressFill').style.width = '80%';
+    document.getElementById('ocrPct').textContent = '80%';
+    document.getElementById('ocrProgressLabel').textContent = `${data.length} IPs encontrados. Consultando AbuseIPDB...`;
+
+    // Consultar AbuseIPDB para cada IP
+    const autoAbuse = document.getElementById('ocrAutoAbuse').checked;
+
+    if (autoAbuse) {
+      for (let i = 0; i < ocrResults.length; i++) {
+        const item = ocrResults[i];
+        const pct = Math.round(80 + ((i + 1) / ocrResults.length) * 18);
+        document.getElementById('ocrProgressFill').style.width = pct + '%';
+        document.getElementById('ocrPct').textContent = pct + '%';
+        document.getElementById('ocrProgressLabel').textContent = `[${i+1}/${ocrResults.length}] ${item.ip}`;
+        try {
+          const ar = await fetch(`${SERVER}/check_ip?ip=${encodeURIComponent(item.ip)}`);
+          const aj = await ar.json();
+          const ad = aj.data || {};
+          item.country = ad.countryCode || '??';
+          item.countryName = ad.countryName || 'Unknown';
+          item.isp = ad.isp || 'Unknown';
+          item.abuse = ad.abuseConfidenceScore || 0;
+          item.reports = ad.totalReports || 0;
+          item.usageType = ad.usageType || 'Unknown';
+          item.isBR   = ad.countryCode === 'BR';
+          item.domain = ad.domain  || '';
+          item.city   = ad.city    || '';
+          item.region = ad.region  || '';
+          item.asn    = ad.asn     || '';
+        } catch {
+          item.country = '??'; item.countryName = 'Unknown'; item.isp = 'Erro';
+          item.abuse = 0; item.reports = 0; item.usageType = 'Unknown'; item.isBR = false;
+        }
+        // Enriquece com ipinfo.io se city ou asn estiver vazio
+        if (!item.city || !item.asn) {
+          try {
+            const ri = await fetch(`${SERVER}/check_ipinfo?ip=${encodeURIComponent(item.ip)}`);
+            if (ri.ok) {
+              const ji = await ri.json();
+              if (!item.city    && ji.city)    item.city    = ji.city;
+              if (!item.region  && ji.region)  item.region  = ji.region;
+              if (!item.asn     && ji.asn)     item.asn     = ji.asn;
+              if (!item.asnName && ji.asnName) item.asnName = ji.asnName;
+            }
+          } catch(e) {
+            console.warn('[ipinfo ocr] Falha:', e.message);
+          }
+        }
+        // Protection vem do servidor — no modo ips_only usa o ataque selecionado pelo usuário
+        if (ocrMode === 'ips_only') {
+          const selectedAttack = document.getElementById('ocrIpsOnlySelect').value || 'Atividade Suspeita';
+          item.protection = selectedAttack;
+        } else if (!item.protection) {
+          item.protection = 'Atividade Suspeita';
+        }
+        await new Promise(res => setTimeout(res, 250));
+      }
+    }
+
+    document.getElementById('ocrProgressFill').style.width = '100%';
+    document.getElementById('ocrPct').textContent = '100%';
+
+    renderOCRResults();
+    document.getElementById('ocrProgress').classList.add('hidden');
+    document.getElementById('ocrResultsSection').classList.remove('hidden');
+    document.getElementById('ocrResultCount').textContent = `${ocrResults.length} IPs extraídos`;
+    document.getElementById('ocrStatus').textContent = `✓ ${ocrResults.length} IPs processados`;
+
+  } catch(e) {
+    document.getElementById('ocrStatus').textContent = '✗ Erro: ' + e.message;
+    document.getElementById('ocrProgress').classList.add('hidden');
+  }
+  document.getElementById('btnExtract').disabled = false;
+}
+
+function renderOCRResults() {
+  const ignoreBR = document.getElementById('ocrIgnoreBR').checked;
+  const container = document.getElementById('ocrResultsList');
+  const filtered = ignoreBR ? ocrResults.filter(r => !r.isBR) : ocrResults;
+
+  if (filtered.length === 0) {
+    container.innerHTML = '<div style="text-align:center;color:var(--text-secondary);padding:1rem;font-size:13px;">Nenhum IP encontrado na imagem.</div>';
+    return;
+  }
+
+  container.innerHTML = filtered.map((item, i) => {
+    const flag = countryFlags[item.country] || '';
+    const protNet = checkProtectedNetwork(item.ip);
+    const bc = protNet
+      ? (protNet.type === 'akamai' ? 'badge-akamai' : 'badge-internal')
+      : !item.abuse ? 'badge-low'
+      : item.abuse > 50 ? 'badge-high' : item.abuse > 20 ? 'badge-mid' : 'badge-low';
+    const abuseStr = protNet ? `🛡 ${protNet.label}` : (item.abuse !== undefined ? item.abuse + '%' : '—');
+    const btn = protNet
+      ? `<span style="font-size:11px;color:#f59e0b;">⚠ Protegido</span>`
+      : `<button class="btn btn-green btn-xs" onclick="adicionarOCRItem(${i})">+ Lista</button>`;
+    return `<div class="ocr-item" style="${protNet ? 'border-color:rgba(245,158,11,0.3);' : ''}">
+      <span class="ocr-item-ip">${item.ip}</span>
+      <span style="color:var(--text-secondary);font-size:11px;min-width:60px;">${flag} ${item.country || '??'}</span>
+      <span class="badge ${bc}" style="min-width:52px;">${abuseStr}</span>
+      <span class="ocr-item-prot" title="${escHtml(item.protection)}">${escHtml(item.protection || '—')}</span>
+      ${btn}
+    </div>`;
+  }).join('');
+}
+
+function adicionarOCRItem(idx) {
+  const ignoreBR = document.getElementById('ocrIgnoreBR').checked;
+  const filtered = ignoreBR ? ocrResults.filter(r => !r.isBR) : ocrResults;
+  const item = filtered[idx];
+  if (!item) return;
+  const protNet = checkProtectedNetwork(item.ip);
+  if (protNet) {
+    alert(`⚠ ATENÇÃO: ${item.ip} pertence à rede protegida:\n${protNet.label} (${protNet.cidr})\nNÃO deve ser bloqueado!`);
+    return;
+  }
+  if (ipList.find(x => x.ip === item.ip)) { alert('IP já está na lista.'); return; }
+  ipList.push({ id: ++idCounter, ...item });
+  renderList();
+  updateMetrics();
+}
+
+function adicionarTodosOCR() {
+  const ignoreBR = document.getElementById('ocrIgnoreBR').checked;
+  const filtered = ignoreBR ? ocrResults.filter(r => !r.isBR) : ocrResults;
+  let added = 0; let skipped = 0;
+  for (const item of filtered) {
+    if (checkProtectedNetwork(item.ip)) { skipped++; continue; }
+    if (!ipList.find(x => x.ip === item.ip)) {
+      ipList.push({ id: ++idCounter, ...item });
+      added++;
+    }
+  }
+  renderList();
+  updateMetrics();
+  const msg = skipped > 0
+    ? `✓ ${added} IPs adicionados — ⚠ ${skipped} protegidos ignorados (Akamai/Interno)`
+    : `✓ ${added} IPs adicionados à lista`;
+  document.getElementById('ocrStatus').textContent = msg;
+}
+
+function limparOCR() {
+  selectedFile = null;
+  ocrResults = [];
+  document.getElementById('imgPreview').style.display = 'none';
+  document.getElementById('imgPreview').src = '';
+  document.getElementById('ocrResultsSection').classList.add('hidden');
+  document.getElementById('ocrStatus').textContent = '';
+  document.getElementById('imageFile').value = '';
+}
+
+// ══════════════════════════════════════
+// SEÇÃO 3 — LISTA
+// ══════════════════════════════════════
+function removerIP(id) {
+  ipList = ipList.filter(x => x.id !== id);
+  renderList();
+  updateMetrics();
+}
+
+function renderList() {
+  const filterBR = document.getElementById('filterBRList').checked;
+  const filterLow = document.getElementById('filterLowList').checked;
+  const sortBy = document.getElementById('sortList') ? document.getElementById('sortList').value : 'abuse';
+
+  let data = [...ipList];
+  if (filterBR) data = data.filter(r => !r.isBR);
+  if (filterLow) data = data.filter(r => r.abuse >= 10);
+
+  if (sortBy === 'abuse') data.sort((a, b) => b.abuse - a.abuse);
+  else if (sortBy === 'reports') data.sort((a, b) => b.reports - a.reports);
+  else if (sortBy === 'country') data.sort((a, b) => a.country.localeCompare(b.country));
+  else if (sortBy === 'ip') data.sort((a, b) => {
+    const pa = a.ip.split('.').map(Number), pb = b.ip.split('.').map(Number);
+    for (let i = 0; i < 4; i++) if (pa[i] !== pb[i]) return pa[i] - pb[i];
+    return 0;
+  });
+
+  const container = document.getElementById('ipListContainer');
+
+  if (data.length === 0) {
+    container.innerHTML = '<div class="empty-list">Nenhum IP adicionado ainda.<br>Use as seções acima para adicionar IPs.</div>';
+    return;
+  }
+
+  container.innerHTML = data.map((r, i) => {
+    const flag = countryFlags[r.country] || '';
+    const bc = r.isBR ? 'badge-br' : r.abuse > 50 ? 'badge-high' : r.abuse > 20 ? 'badge-mid' : 'badge-low';
+    const rowClass = r.isBR ? 'ip-list-item is-br' : r.abuse > 50 ? 'ip-list-item is-high' : 'ip-list-item';
+    return `<div class="${rowClass}" id="row-${r.id}">
+      <span class="item-num">${i + 1}</span>
+      <span class="item-ip" title="${r.ip}">${r.ip}</span>
+      <span class="item-country">${flag} ${r.country}</span>
+      <span class="item-city" title="${r.city || ''}">${r.city || '—'}</span>
+      <span class="item-isp" title="${r.isp}">${r.isp}</span>
+      <span><span class="badge ${bc}">${r.abuse}%</span></span>
+      <span style="color:var(--text-secondary);font-size:11px;">${r.reports}</span>
+      <span class="item-prot" title="${escHtml(r.protection)}">${escHtml(r.protection || '—')}</span>
+      <button class="item-remove" onclick="removerIP(${r.id})" title="Remover">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function updateMetrics() {
+  document.getElementById('metTotal').textContent = ipList.length;
+  document.getElementById('metHigh').textContent = ipList.filter(r => r.abuse > 50).length;
+  document.getElementById('metBR').textContent = ipList.filter(r => r.isBR).length;
+  document.getElementById('metBlock').textContent = ipList.filter(r => !r.isBR).length;
+}
+
+function limparLista() {
+  if (ipList.length > 0 && !confirm(`Remover todos os ${ipList.length} IPs da lista?`)) return;
+  ipList = [];
+  renderList();
+  updateMetrics();
+}
+
+function generateCommands() {
+  const group = document.getElementById('groupName').value.trim() || gerarGrupoAtual();
+  const filtered = ipList.filter(r => !r.isBR && !checkProtectedNetwork(r.ip));
+  return filtered.map(r =>
+    `add host name "Host_${r.ip}" ip-address "${r.ip}" groups.1 "${group}" comments "Host responsavel por ${r.protection || 'Atividade Suspeita'}"`
+  ).join('\n');
+}
+
+function generateIPsOnly() {
+  return ipList.filter(r => !r.isBR && !checkProtectedNetwork(r.ip)).map(r => r.ip).join('\n');
+}
+
+function switchTab3(tabId) {
+  ['tabList','tabCmds','tabIPs'].forEach(t => document.getElementById(t).classList.add('hidden'));
+  document.getElementById(tabId).classList.remove('hidden');
+  document.querySelectorAll('.tabs .tab').forEach((btn, i) => {
+    btn.classList.toggle('active', ['tabList','tabCmds','tabIPs'][i] === tabId);
+  });
+  if (tabId === 'tabCmds') {
+    const cmds = generateCommands();
+    document.getElementById('cmdsOutput').textContent = cmds;
+    document.getElementById('cmdCount').textContent = ipList.filter(r => !r.isBR && !checkProtectedNetwork(r.ip)).length + ' comandos';
+  }
+  if (tabId === 'tabIPs') {
+    const ips = generateIPsOnly();
+    document.getElementById('ipsOutput').textContent = ips;
+    document.getElementById('ipCount').textContent = ipList.filter(r => !r.isBR && !checkProtectedNetwork(r.ip)).length + ' IPs';
+  }
+}
+
+function copiarOutput(elemId, btn) {
+  const text = document.getElementById(elemId).textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = '✓ Copiado!';
+    btn.style.color = 'var(--accent-green)';
+    setTimeout(() => { btn.textContent = orig; btn.style.color = ''; }, 2000);
+  });
+}
+
+// ══════════════════════════════════════
+// UTILS
+// ══════════════════════════════════════
+function escHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ══════════════════════════════════════
+// SEÇÃO 4 — CALCULADORA DE SUB-REDE
+// ══════════════════════════════════════
+
+function ipToInt4(ip) {
+  return ip.split('.').reduce((acc, o) => (acc << 8) + parseInt(o, 10), 0) >>> 0;
+}
+
+function intToIp(n) {
+  return [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255].join('.');
+}
+
+function prefixToMask(prefix) {
+  return prefix === 0 ? 0 : (0xFFFFFFFF << (32 - prefix)) >>> 0;
+}
+
+function getIpClass(firstOctet) {
+  if (firstOctet < 128) return 'A';
+  if (firstOctet < 192) return 'B';
+  if (firstOctet < 224) return 'C';
+  if (firstOctet < 240) return 'D (Multicast)';
+  return 'E (Reservada)';
+}
+
+function getIpType(ip) {
+  const f = parseInt(ip.split('.')[0]);
+  const s = parseInt(ip.split('.')[1]);
+  if (f === 10) return 'Privado (RFC1918)';
+  if (f === 172 && s >= 16 && s <= 31) return 'Privado (RFC1918)';
+  if (f === 192 && s === 168) return 'Privado (RFC1918)';
+  if (f === 127) return 'Loopback';
+  if (f === 169 && s === 254) return 'Link-local (APIPA)';
+  if (f >= 224 && f < 240) return 'Multicast';
+  return 'Público';
+}
+
+function maskToBinary(mask) {
+  const parts = mask.split('.').map(Number);
+  return parts.map(p => p.toString(2).padStart(8, '0')).join('.');
+}
+
+let subnetCalcData = null; // guarda resultado para gerar comandos
+
+function calcSubnet() {
+  const raw = document.getElementById('subnetInput').value.trim();
+
+  // Reset outputs
+  const resetIds = ['sub-mask','sub-wildcard','sub-cidr','sub-network','sub-broadcast',
+                    'sub-range','sub-hosts','sub-class','sub-type','sub-bits','sub-binary'];
+  resetIds.forEach(id => { const el = document.getElementById(id); if(el) el.textContent = '—'; });
+  document.getElementById('subnetTableBody').innerHTML =
+    '<tr><td colspan="5" style="text-align:center;color:var(--text-secondary);padding:1.5rem;">Digite um bloco CIDR acima para calcular.</td></tr>';
+  document.getElementById('subnetCmdsSection').classList.add('hidden');
+  subnetCalcData = null;
+
+  if (!raw) return;
+
+  // Aceita "192.168.1.0/24" ou "192.168.1.0" (assume /32)
+  let ipStr, prefix;
+  if (raw.includes('/')) {
+    const parts = raw.split('/');
+    ipStr = parts[0];
+    prefix = parseInt(parts[1], 10);
+  } else {
+    // Verifica se parece IP puro
+    if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(raw)) return;
+    ipStr = raw;
+    prefix = 32;
+  }
+
+  if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(ipStr)) return;
+  if (isNaN(prefix) || prefix < 0 || prefix > 32) return;
+  const octets = ipStr.split('.').map(Number);
+  if (octets.some(o => o < 0 || o > 255)) return;
+
+  const ipInt    = ipToInt4(ipStr);
+  const maskInt  = prefixToMask(prefix);
+  const netInt   = (ipInt & maskInt) >>> 0;
+  const bcastInt = (netInt | (~maskInt >>> 0)) >>> 0;
+  const firstHost = prefix < 31 ? netInt + 1 : netInt;
+  const lastHost  = prefix < 31 ? bcastInt - 1 : bcastInt;
+  const totalHosts = prefix >= 31 ? (prefix === 32 ? 1 : 2) : Math.pow(2, 32 - prefix) - 2;
+
+  const maskStr     = intToIp(maskInt);
+  const wildcardStr = intToIp(~maskInt >>> 0);
+  const netStr      = intToIp(netInt);
+  const bcastStr    = intToIp(bcastInt);
+  const firstStr    = intToIp(firstHost);
+  const lastStr     = intToIp(lastHost);
+
+  document.getElementById('sub-mask').textContent     = maskStr;
+  document.getElementById('sub-wildcard').textContent = wildcardStr;
+  document.getElementById('sub-cidr').textContent     = `${netStr}/${prefix}`;
+  document.getElementById('sub-network').textContent  = netStr;
+  document.getElementById('sub-broadcast').textContent= bcastStr;
+  document.getElementById('sub-range').textContent    = prefix >= 32 ? netStr : `${firstStr} – ${lastStr}`;
+  document.getElementById('sub-hosts').textContent    = totalHosts.toLocaleString('pt-BR');
+  document.getElementById('sub-class').textContent    = getIpClass(octets[0]);
+  document.getElementById('sub-type').textContent     = getIpType(ipStr);
+  document.getElementById('sub-bits').textContent     = `${prefix} rede / ${32 - prefix} host`;
+  document.getElementById('sub-binary').textContent   = maskToBinary(maskStr);
+
+  // Sub-redes divididas
+  const divideEl = document.getElementById('subnetDivide');
+  const divPrefix = parseInt(divideEl.value, 10);
+  const usePrefix = (!isNaN(divPrefix) && divPrefix > prefix && divPrefix <= 32) ? divPrefix : prefix;
+
+  const subSize    = Math.pow(2, 32 - usePrefix) >>> 0;
+  const numSubnets = usePrefix === prefix ? 1 : Math.pow(2, usePrefix - prefix);
+  const MAX_ROWS   = 256;
+  const showCount  = Math.min(numSubnets, MAX_ROWS);
+
+  let rows = '';
+  for (let i = 0; i < showCount; i++) {
+    const sNet    = (netInt + i * subSize) >>> 0;
+    const sBcast  = (sNet + subSize - 1) >>> 0;
+    const sFirst  = usePrefix < 31 ? sNet + 1 : sNet;
+    const sLast   = usePrefix < 31 ? sBcast - 1 : sBcast;
+    const sHosts  = usePrefix >= 31 ? (usePrefix === 32 ? 1 : 2) : subSize - 2;
+    rows += `<tr>
+      <td>${i + 1}</td>
+      <td>${intToIp(sNet)}</td>
+      <td>${usePrefix >= 32 ? intToIp(sNet) : intToIp(sFirst) + ' – ' + intToIp(sLast)}</td>
+      <td>${usePrefix >= 32 ? '—' : intToIp(sBcast)}</td>
+      <td>${sHosts.toLocaleString('pt-BR')}</td>
+    </tr>`;
+  }
+  if (numSubnets > MAX_ROWS) {
+    rows += `<tr><td colspan="5" class="subnet-row-limit">
+      ⚠ Exibindo ${MAX_ROWS} de ${numSubnets.toLocaleString('pt-BR')} sub-redes. Use um prefixo maior para ver todas.
+    </td></tr>`;
+  }
+  document.getElementById('subnetTableBody').innerHTML = rows;
+
+  // Salva dados para geração de comandos
+  subnetCalcData = { netStr, prefix, usePrefix, numSubnets: Math.min(numSubnets, MAX_ROWS), netInt, subSize };
+}
+
+function gerarComandosSubnet() {
+  if (!subnetCalcData) { alert('Calcule um bloco CIDR primeiro.'); return; }
+
+  const group  = document.getElementById('subnetGroup').value.trim() || gerarGrupoAtual();
+  const attack = document.getElementById('subnetAttackSelect').value || 'Atividade Suspeita';
+  document.getElementById('subnetGroup').value = group;
+
+  const { netInt, subSize, usePrefix, numSubnets } = subnetCalcData;
+  const MAX_CMDS = 256;
+  const total = Math.min(numSubnets, MAX_CMDS);
+
+  let cmds = [];
+  for (let i = 0; i < total; i++) {
+    const sNetInt  = (netInt + i * subSize) >>> 0;
+    const sNet     = intToIp(sNetInt);
+    const maskStr  = intToIp(prefixToMask(usePrefix));
+    cmds.push(`add network name "NET_${sNet}/${usePrefix}" subnet "${sNet}" subnet-mask "${maskStr}" groups.1 "${group}" comments "Rede responsável por ${attack}"`);
+  }
+
+  document.getElementById('subnetCmdsOutput').textContent = cmds.join('\n');
+  document.getElementById('subnetCmdCount').textContent = `${cmds.length} comando${cmds.length !== 1 ? 's' : ''}`;
+  document.getElementById('subnetCmdsSection').classList.remove('hidden');
+}
+
+function copiarSubnetCmds(btn) {
+  let txt = document.getElementById('subnetCmdsOutput').textContent;
+
+  // Gera se estiver vazio
+  if (!txt) {
+    gerarComandosSubnet();
+    txt = document.getElementById('subnetCmdsOutput').textContent;
+  }
+
+  navigator.clipboard.writeText(txt).then(() => {
+    const orig = btn.textContent;
+
+    btn.textContent = '✓ Copiado!';
+    btn.style.color = 'var(--accent-green)';
+
+    setTimeout(() => {
+      btn.textContent = orig;
+      btn.style.color = '';
+    }, 2000);
+
+  }).catch(() => {
+    console.warn("Erro ao copiar");
+  });
+}
+
+// Inicializa campo de grupo da subnet com o valor atual
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('subnetGroup').value = gerarGrupoAtual();
+});
+</script>
+</body>
+</html>

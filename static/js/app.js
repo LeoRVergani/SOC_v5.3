@@ -1,0 +1,792 @@
+// ══════════════════════════════════════
+// ESTADO GLOBAL
+// ══════════════════════════════════════
+const SERVER = 'http://127.0.0.1:5000';
+
+// Gera "Bloqueios <Mes> <Ano>" automaticamente com o mes/ano atual
+function gerarGrupoAtual() {
+  const meses = [
+    'Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+    'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'
+  ];
+  const now = new Date();
+  return `Bloqueios ${meses[now.getMonth()]} ${now.getFullYear()}`;
+}
+
+// Preenche o campo ao carregar a pagina
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('groupName').value = gerarGrupoAtual();
+});
+let ipList = []; // {id, ip, country, countryName, isp, abuse, reports, usageType, isBR, protection}
+let singleData = null;
+let ocrResults = [];
+let idCounter = 0;
+
+// ══════════════════════════════════════
+// REDES PROTEGIDAS — NÃO BLOQUEAR
+// ══════════════════════════════════════
+const PROTECTED_NETWORKS = [
+  // ── Akamai Site Shield / CDN (atualizado) ──
+  { cidr: '184.24.0.0/13',   label: 'Akamai CDN', type: 'akamai' },
+  { cidr: '2.16.0.0/13',     label: 'Akamai CDN', type: 'akamai' },
+  { cidr: '23.0.0.0/12',     label: 'Akamai CDN', type: 'akamai' },
+  { cidr: '23.192.0.0/11',   label: 'Akamai CDN', type: 'akamai' },
+  { cidr: '23.32.0.0/11',    label: 'Akamai CDN', type: 'akamai' },
+  { cidr: '95.100.0.0/15',   label: 'Akamai CDN', type: 'akamai' },
+  // ── Redes Internas ──
+  { cidr: '10.0.0.0/8',      label: 'Rede Interna', type: 'internal' },
+  { cidr: '192.168.0.0/16',  label: 'Rede Interna', type: 'internal' },
+  { cidr: '172.16.0.0/12',   label: 'Rede Interna', type: 'internal' },
+];
+
+// Convert IP string to 32-bit integer
+function ipToInt(ip) {
+  return ip.split('.').reduce((acc, oct) => (acc << 8) + parseInt(oct), 0) >>> 0;
+}
+
+// Check if IP belongs to a CIDR block
+function ipInCidr(ip, cidr) {
+  const [net, bits] = cidr.split('/');
+  const mask = bits === '32' ? 0xFFFFFFFF : (~(0xFFFFFFFF >>> parseInt(bits))) >>> 0;
+  return (ipToInt(ip) & mask) === (ipToInt(net) & mask);
+}
+
+// Returns protection info if IP is in a protected network, or null
+function checkProtectedNetwork(ip) {
+  for (const net of PROTECTED_NETWORKS) {
+    try {
+      if (ipInCidr(ip, net.cidr)) return net;
+    } catch { continue; }
+  }
+  return null;
+}
+
+const countryFlags = {
+  BR:'🇧🇷',US:'🇺🇸',CN:'🇨🇳',RU:'🇷🇺',DE:'🇩🇪',GB:'🇬🇧',FR:'🇫🇷',IN:'🇮🇳',
+  PK:'🇵🇰',NL:'🇳🇱',CA:'🇨🇦',AU:'🇦🇺',JP:'🇯🇵',KR:'🇰🇷',UA:'🇺🇦',ES:'🇪🇸',
+  IT:'🇮🇹',MX:'🇲🇽',AR:'🇦🇷',CL:'🇨🇱',CO:'🇨🇴',VN:'🇻🇳',ID:'🇮🇩',TH:'🇹🇭',
+  TW:'🇹🇼',HK:'🇭🇰',SG:'🇸🇬',PL:'🇵🇱',RO:'🇷🇴',CZ:'🇨🇿',PT:'🇵🇹',
+  SE:'🇸🇪',NO:'🇳🇴',FI:'🇫🇮',DK:'🇩🇰',CH:'🇨🇭',AT:'🇦🇹',BE:'🇧🇪',TR:'🇹🇷',
+  IR:'🇮🇷',SA:'🇸🇦',EG:'🇪🇬',ZA:'🇿🇦',NG:'🇳🇬',KE:'🇰🇪',MA:'🇲🇦',
+  BD:'🇧🇩',LK:'🇱🇰',PH:'🇵🇭',MY:'🇲🇾',AM:'🇦🇲',GE:'🇬🇪',IL:'🇮🇱',
+  SK:'🇸🇰',HU:'🇭🇺',RS:'🇷🇸',BG:'🇧🇬',HR:'🇭🇷',UA:'🇺🇦',MK:'🇲🇰',
+  LV:'🇱🇻',LT:'🇱🇹',EE:'🇪🇪',AZ:'🇦🇿',KZ:'🇰🇿',UZ:'🇺🇿',VE:'🇻🇪',PE:'🇵🇪',
+  EC:'🇪🇨',BO:'🇧🇴',PY:'🇵🇾',UY:'🇺🇾',GT:'🇬🇹',CR:'🇨🇷',PA:'🇵🇦',CU:'🇨🇺',
+  DO:'🇩🇴',HN:'🇭🇳',SV:'🇸🇻',NI:'🇳🇮',JM:'🇯🇲',HT:'🇭🇹',TT:'🇹🇹',
+};
+
+// ══════════════════════════════════════
+// CLOCK & SERVER STATUS
+// ══════════════════════════════════════
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clockDisplay').textContent =
+    now.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+async function checkServer() {
+  try {
+    const r = await fetch(`${SERVER}/attacks`);
+    if (r.ok) {
+      document.getElementById('serverStatus').textContent = 'online';
+      document.getElementById('serverStatus').style.color = 'var(--accent-green)';
+    }
+  } catch {
+    document.getElementById('serverStatus').textContent = 'offline';
+    document.getElementById('serverStatus').style.color = 'var(--accent-red)';
+  }
+}
+checkServer();
+
+// ══════════════════════════════════════
+// ATTACKS LIST
+// ══════════════════════════════════════
+async function loadAttacks() {
+  try {
+    const r = await fetch(`${SERVER}/attacks`);
+    const attacks = await r.json();
+    const sel = document.getElementById('attackSelect');
+    sel.innerHTML = attacks.map(a => `<option value="${escHtml(a)}">${escHtml(a)}</option>`).join('');
+    // Also populate bulk select
+    const sel2 = document.getElementById('bulkAttackSelect');
+    if (sel2) sel2.innerHTML = attacks.map(a => `<option value="${escHtml(a)}">${escHtml(a)}</option>`).join('');
+  } catch {
+    document.getElementById('attackSelect').innerHTML = '<option value="Atividade Suspeita">Atividade Suspeita</option>';
+    const s2 = document.getElementById('bulkAttackSelect');
+    if (s2) s2.innerHTML = '<option value="Atividade Suspeita">Atividade Suspeita</option>';
+  }
+}
+loadAttacks();
+
+// ══════════════════════════════════════
+// SEÇÃO 2 — SUB-TABS
+// ══════════════════════════════════════
+function switchSec2(tab) {
+  document.getElementById('sec2PanelImg').classList.toggle('hidden', tab !== 'img');
+  document.getElementById('sec2PanelList').classList.toggle('hidden', tab !== 'list');
+  document.getElementById('sec2TabImg').classList.toggle('active', tab === 'img');
+  document.getElementById('sec2TabList').classList.toggle('active', tab === 'list');
+}
+
+// ── BULK: carregar arquivo .txt ──
+function loadIPFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('ipBulkInput').value = e.target.result;
+    document.getElementById('ipBulkFileStatus').textContent = `✓ ${file.name} carregado`;
+  };
+  reader.readAsText(file);
+}
+
+// ── BULK: parse IPs from textarea ──
+function parseBulkIPs(text) {
+  return [...new Set(
+    text.split(/[\n,;\s]+/)
+      .map(s => s.trim())
+      .filter(s => /^\d{1,3}(\.\d{1,3}){3}$/.test(s))
+      .filter(s => s.split('.').map(Number).every(p => p >= 0 && p <= 255))
+  )];
+}
+
+let bulkAbortFlag = false;
+let bulkResults = [];
+
+async function processarListaIPs() {
+  const text = document.getElementById('ipBulkInput').value;
+  const ips = parseBulkIPs(text);
+
+  if (ips.length === 0) {
+    alert('Nenhum IP válido encontrado. Cole os IPs um por linha.');
+    return;
+  }
+
+  bulkAbortFlag = false;
+  bulkResults = [];
+
+  document.getElementById('btnBulk').classList.add('hidden');
+  document.getElementById('btnBulkAbort').classList.remove('hidden');
+  document.getElementById('bulkProgress').classList.remove('hidden');
+  document.getElementById('bulkResultsSection').classList.add('hidden');
+  document.getElementById('bulkStatus').textContent = `${ips.length} IPs encontrados`;
+
+  const autoAbuse = document.getElementById('bulkAutoAbuse').checked;
+  const ignoreBR  = document.getElementById('bulkIgnoreBR').checked;
+  const attack    = document.getElementById('bulkAttackSelect').value || 'Atividade Suspeita';
+
+  for (let i = 0; i < ips.length; i++) {
+    if (bulkAbortFlag) break;
+
+    const ip = ips[i];
+    const pct = Math.round(((i + 1) / ips.length) * 100);
+    document.getElementById('bulkProgressFill').style.width = pct + '%';
+    document.getElementById('bulkPct').textContent = pct + '%';
+    document.getElementById('bulkProgressLabel').textContent = `[${i+1}/${ips.length}] ${ip}`;
+
+    const item = { ip, country: '??', countryName: 'Unknown', isp: 'Não consultado',
+                   abuse: 0, reports: 0, usageType: 'Unknown', isBR: false,
+                   domain: '', protection: attack };
+
+    if (autoAbuse) {
+      try {
+        const r = await fetch(`${SERVER}/check_ip?ip=${encodeURIComponent(ip)}`);
+        const json = await r.json();
+        const d = json.data || {};
+        item.country     = d.countryCode    || '??';
+        item.countryName = d.countryName    || 'Unknown';
+        item.isp         = d.isp            || 'Unknown';
+        item.abuse       = d.abuseConfidenceScore || 0;
+        item.reports     = d.totalReports   || 0;
+        item.usageType   = d.usageType      || 'Unknown';
+        item.isBR        = d.countryCode === 'BR';
+        item.domain      = d.domain         || '';
+        item.city        = d.city           || '';
+        item.region      = d.region         || '';
+        item.asn         = d.asn            || '';
+        item.asnName     = d.asnName        || '';
+      } catch {
+        item.isp = 'Erro na consulta';
+      }
+      await new Promise(res => setTimeout(res, 250));
+    }
+
+    if (ignoreBR && item.isBR) continue;
+    bulkResults.push(item);
+  }
+
+  document.getElementById('btnBulk').classList.remove('hidden');
+  document.getElementById('btnBulkAbort').classList.add('hidden');
+  document.getElementById('bulkProgress').classList.add('hidden');
+  document.getElementById('bulkResultsSection').classList.remove('hidden');
+  document.getElementById('bulkResultCount').textContent = `${bulkResults.length} IPs processados`;
+  document.getElementById('bulkStatus').textContent = `✓ ${bulkResults.length} IPs prontos`;
+
+  renderBulkResults();
+}
+
+function abortarBulk() {
+  bulkAbortFlag = true;
+  document.getElementById('btnBulkAbort').classList.add('hidden');
+  document.getElementById('btnBulk').classList.remove('hidden');
+  document.getElementById('bulkStatus').textContent = '⚠ Processamento interrompido';
+}
+
+function renderBulkResults() {
+  const container = document.getElementById('bulkResultsList');
+  if (bulkResults.length === 0) {
+    container.innerHTML = '<div style="text-align:center;color:var(--text-secondary);padding:1rem;font-size:13px;">Nenhum IP para exibir.</div>';
+    return;
+  }
+  container.innerHTML = bulkResults.map((item, i) => {
+    const flag = countryFlags[item.country] || '';
+    const protNet = checkProtectedNetwork(item.ip);
+    const bc = protNet
+      ? (protNet.type === 'akamai' ? 'badge-akamai' : 'badge-internal')
+      : item.isBR ? 'badge-br'
+      : item.abuse > 50 ? 'badge-high' : item.abuse > 20 ? 'badge-mid' : 'badge-low';
+    const abuseStr = protNet ? `🛡 ${protNet.label}` : `${item.abuse}%`;
+    const btn = protNet
+      ? `<span style="font-size:11px;color:#f59e0b;">⚠ Protegido</span>`
+      : `<button class="btn btn-green btn-xs" onclick="adicionarBulkItem(${i})">+ Lista</button>`;
+    return `<div class="ocr-item" style="${protNet ? 'border-color:rgba(245,158,11,0.3);' : ''}">
+      <span class="ocr-item-ip">${item.ip}</span>
+      <span style="color:var(--text-secondary);font-size:11px;min-width:60px;">${flag} ${item.country}</span>
+      <span class="badge ${bc}" style="min-width:52px;">${abuseStr}</span>
+      <span class="ocr-item-prot" title="${escHtml(item.protection)}">${escHtml(item.protection)}</span>
+      ${btn}
+    </div>`;
+  }).join('');
+}
+
+function adicionarBulkItem(idx) {
+  const item = bulkResults[idx];
+  if (!item) return;
+  const protNet = checkProtectedNetwork(item.ip);
+  if (protNet) {
+    alert(`⚠ ATENÇÃO: ${item.ip} pertence à rede protegida:\n${protNet.label} (${protNet.cidr})\nNÃO deve ser bloqueado!`);
+    return;
+  }
+  if (ipList.find(x => x.ip === item.ip)) { alert('IP já está na lista.'); return; }
+  ipList.push({ id: ++idCounter, ...item });
+  renderList();
+  updateMetrics();
+}
+
+function adicionarTodosBulk() {
+  let added = 0; let skipped = 0;
+  for (const item of bulkResults) {
+    if (checkProtectedNetwork(item.ip)) { skipped++; continue; }
+    if (!ipList.find(x => x.ip === item.ip)) {
+      ipList.push({ id: ++idCounter, ...item });
+      added++;
+    }
+  }
+  renderList();
+  updateMetrics();
+  const msg = skipped > 0
+    ? `✓ ${added} adicionados — ⚠ ${skipped} protegidos ignorados`
+    : `✓ ${added} IPs adicionados à lista`;
+  document.getElementById('bulkStatus').textContent = msg;
+}
+
+function limparBulk() {
+  bulkResults = [];
+  bulkAbortFlag = false;
+  document.getElementById('ipBulkInput').value = '';
+  document.getElementById('bulkResultsSection').classList.add('hidden');
+  document.getElementById('bulkProgress').classList.add('hidden');
+  document.getElementById('bulkStatus').textContent = '';
+  document.getElementById('ipBulkFileStatus').textContent = '';
+  document.getElementById('ipBulkFile').value = '';
+}
+
+function toggleAddAttack() {
+  document.getElementById('addAttackRow').classList.toggle('hidden');
+  if (!document.getElementById('addAttackRow').classList.contains('hidden')) {
+    document.getElementById('newAttackInput').focus();
+  }
+}
+
+async function saveNewAttack() {
+  const val = document.getElementById('newAttackInput').value.trim();
+  if (!val) return;
+  try {
+    const r = await fetch(`${SERVER}/attacks`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({attack: val})
+    });
+    const data = await r.json();
+    if (data.attacks) {
+      const sel = document.getElementById('attackSelect');
+      sel.innerHTML = data.attacks.map(a => `<option value="${escHtml(a)}">${escHtml(a)}</option>`).join('');
+      sel.value = val;
+    }
+    document.getElementById('newAttackInput').value = '';
+    document.getElementById('addAttackRow').classList.add('hidden');
+  } catch(e) {
+    alert('Erro ao salvar ataque: ' + e.message);
+  }
+}
+
+// ══════════════════════════════════════
+// SEÇÃO 1 — IP ÚNICO
+// ══════════════════════════════════════
+async function consultarSingle() {
+  const ip = document.getElementById('singleIP').value.trim();
+  if (!ip || !/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) {
+    alert('Digite um IP válido.');
+    return;
+  }
+
+  const attack = document.getElementById('attackSelect').value || 'Atividade Suspeita';
+  const group  = document.getElementById('groupName').value  || gerarGrupoAtual();
+
+  document.getElementById('singleStatus').textContent = 'Consultando...';
+  document.getElementById('btnSingle').disabled = true;
+  document.getElementById('singleResult').style.display = 'none';
+  singleData = null;
+
+  // Monta dados base — funciona offline
+  singleData = {
+    id: ++idCounter,
+    ip: ip,
+    country: '??', countryName: 'Sem dados',
+    isp: '—', abuse: 0, reports: 0,
+    usageType: '—', isBR: false, domain: '—',
+    protection: attack, offline: true
+  };
+
+  let consultaOK = false;
+
+  try {
+    const r = await fetch(`${SERVER}/check_ip?ip=${encodeURIComponent(ip)}`);
+    // Só processa se retornou 200 — status 500/timeout não lança exceção mas não tem dados
+    if (r.ok) {
+      const json = await r.json();
+      const d = json.data || {};
+      if (d.ipAddress || d.abuseConfidenceScore !== undefined) {
+        singleData.country     = d.countryCode           || '??';
+        singleData.countryName = d.countryName           || 'Unknown';
+        singleData.isp         = d.isp                   || 'Unknown';
+        singleData.abuse       = d.abuseConfidenceScore  || 0;
+        singleData.reports     = d.totalReports          || 0;
+        singleData.users       = d.numDistinctUsers      || 0;
+        singleData.lastReport  = d.lastReportedAt        || null;
+        singleData.usageType   = d.usageType             || 'Unknown';
+        singleData.isBR        = d.countryCode === 'BR';
+        singleData.domain      = d.domain                || '—';
+        singleData.city        = d.city                  || '';
+        singleData.region      = d.region                || '';
+        singleData.asn         = d.asn                   || '';
+        singleData.asnName     = d.asnName               || '';
+        singleData.org         = d.org                   || '';
+        singleData.isHosting   = d.isHosting             || false;
+        singleData.offline     = false;
+        consultaOK = true;
+      }
+    } else {
+      console.warn(`[consultarSingle] Servidor retornou ${r.status} — usando dados locais`);
+    }
+  } catch(e) {
+    // Servidor offline, rede indisponível ou CORS — continua com dados locais
+    console.warn('[consultarSingle] Sem conexão:', e.message);
+  }
+
+  // Renderiza card (com ou sem dados do AbuseIPDB)
+  const { country, countryName, isp, abuse, reports, usageType, domain, isBR, offline } = singleData;
+  const flag = countryFlags[country] || '';
+  const protNet = checkProtectedNetwork(ip);
+  singleData.protectedNet = protNet || null;
+
+  document.getElementById('r-ip').textContent = ip;
+  const cityStr = (singleData.city && singleData.region)
+    ? ` · ${singleData.city}, ${singleData.region}`
+    : singleData.city ? ` · ${singleData.city}` : '';
+  document.getElementById('r-country').textContent = consultaOK
+    ? `${flag} ${country} — ${countryName}${cityStr}`
+    : '— (sem consulta)';
+  document.getElementById('r-isp').textContent = isp;
+  document.getElementById('r-abuse').innerHTML = consultaOK
+    ? `<span class="badge ${abuse > 50 ? 'badge-high' : abuse > 20 ? 'badge-mid' : 'badge-low'}">${abuse}%</span>`
+    : `<span class="badge badge-low" style="color:var(--text-secondary);">—</span>`;
+  document.getElementById('r-reports').textContent = consultaOK ? reports : '—';
+  document.getElementById('r-users').textContent   = consultaOK ? (singleData.users || '—') : '—';
+  document.getElementById('r-last').textContent    = consultaOK && singleData.lastReport
+    ? new Date(singleData.lastReport).toLocaleString('pt-BR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})
+    : '—';
+  document.getElementById('r-type').textContent   = usageType;
+  document.getElementById('r-domain').textContent = domain;
+  const asnEl = document.getElementById('r-asn');
+  if (asnEl) asnEl.textContent = consultaOK && singleData.asn
+    ? singleData.asn + (singleData.asnName ? \` — \${singleData.asnName}\` : '')
+    : '—';
+  document.getElementById('r-status').innerHTML   = protNet
+    ? `<span style="color:#f59e0b;font-size:11px;">🛡 ${protNet.label} — NÃO BLOQUEAR</span>`
+    : isBR
+      ? '<span class="status-br">🇧🇷 Brasil</span>'
+      : abuse > 50
+        ? '<span class="status-risk">⚠ Alto risco</span>'
+        : '<span class="status-block">✓ Bloquear</span>';
+
+  // Comando gerado SEMPRE, independente da consulta
+  document.getElementById('r-cmd').textContent =
+    `add host name "Host_${ip}" ip-address "${ip}" groups.1 "${group}" comments "Host responsavel por ${attack}"`;
+
+  document.getElementById('singleResult').style.display = 'block';
+  document.getElementById('singleStatus').textContent = consultaOK
+    ? '✓ Consulta concluída'
+    : '⚠ Offline — comando gerado sem dados do AbuseIPDB';
+  document.getElementById('singleStatus').style.color = consultaOK
+    ? 'var(--accent-green)'
+    : 'var(--accent-yellow)';
+
+  document.getElementById('btnSingle').disabled = false;
+}
+
+function adicionarSingleNaLista() {
+  if (!singleData) return;
+  const protNet = checkProtectedNetwork(singleData.ip);
+  if (protNet) {
+    alert(`⚠ ATENÇÃO: O IP ${singleData.ip} pertence à rede protegida:\n${protNet.label} (${protNet.cidr})\n\nEste IP NÃO deve ser bloqueado!`);
+    return;
+  }
+  if (ipList.find(x => x.ip === singleData.ip)) {
+    alert('Este IP já está na lista.');
+    return;
+  }
+  ipList.push({...singleData});
+  renderList();
+  updateMetrics();
+  document.getElementById('singleStatus').textContent = '✓ IP adicionado à lista';
+}
+
+function copiarCmd() {
+  const txt = document.getElementById('r-cmd').textContent;
+  navigator.clipboard.writeText(txt).catch(() => {});
+}
+
+// ══════════════════════════════════════
+// SEÇÃO 2 — OCR / PRINT
+// ══════════════════════════════════════
+let selectedFile = null;
+
+function handleFileSelect(input) {
+  const file = input.files[0];
+  if (file) { selectedFile = file; showPreview(file); }
+}
+
+function showPreview(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = document.getElementById('imgPreview');
+    img.src = e.target.result;
+    img.style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+
+// Drag and drop
+const dz = document.getElementById('dropzone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('image/')) { selectedFile = file; showPreview(file); }
+});
+
+// Paste from clipboard (Ctrl+V)
+document.addEventListener('paste', e => {
+  const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+  for (const item of items) {
+    if (item.kind === 'file' && item.type.startsWith('image/')) {
+      const file = item.getAsFile();
+      selectedFile = file;
+      showPreview(file);
+      document.getElementById('ocrStatus').textContent = '✓ Imagem colada do clipboard';
+      break;
+    }
+  }
+});
+
+async function extrairDoprint() {
+  if (!selectedFile) {
+    alert('Selecione, arraste ou cole (Ctrl+V) uma imagem primeiro.');
+    return;
+  }
+
+  document.getElementById('ocrProgress').classList.remove('hidden');
+  document.getElementById('ocrResultsSection').classList.add('hidden');
+  document.getElementById('btnExtract').disabled = true;
+  document.getElementById('ocrStatus').textContent = 'Enviando imagem...';
+  document.getElementById('ocrProgressFill').style.width = '20%';
+  document.getElementById('ocrPct').textContent = '20%';
+  document.getElementById('ocrProgressLabel').textContent = 'Enviando ao servidor OCR...';
+
+  const formData = new FormData();
+  formData.append('image', selectedFile);
+
+  try {
+    const r = await fetch(`${SERVER}/extract_image`, { method: 'POST', body: formData });
+    document.getElementById('ocrProgressFill').style.width = '60%';
+    document.getElementById('ocrPct').textContent = '60%';
+    document.getElementById('ocrProgressLabel').textContent = 'Processando OCR...';
+
+    const data = await r.json();
+
+    if (data.error) {
+      document.getElementById('ocrStatus').textContent = '✗ ' + data.error;
+      document.getElementById('ocrProgress').classList.add('hidden');
+      document.getElementById('btnExtract').disabled = false;
+      return;
+    }
+
+    ocrResults = data;
+    document.getElementById('ocrProgressFill').style.width = '80%';
+    document.getElementById('ocrPct').textContent = '80%';
+    document.getElementById('ocrProgressLabel').textContent = `${data.length} IPs encontrados. Consultando AbuseIPDB...`;
+
+    // Consultar AbuseIPDB para cada IP
+    const autoAbuse = document.getElementById('ocrAutoAbuse').checked;
+    const defaultProt = document.getElementById('ocrDefaultProt').value || 'Atividade Suspeita';
+
+    if (autoAbuse) {
+      for (let i = 0; i < ocrResults.length; i++) {
+        const item = ocrResults[i];
+        const pct = Math.round(80 + ((i + 1) / ocrResults.length) * 18);
+        document.getElementById('ocrProgressFill').style.width = pct + '%';
+        document.getElementById('ocrPct').textContent = pct + '%';
+        document.getElementById('ocrProgressLabel').textContent = `[${i+1}/${ocrResults.length}] ${item.ip}`;
+        try {
+          const ar = await fetch(`${SERVER}/check_ip?ip=${encodeURIComponent(item.ip)}`);
+          const aj = await ar.json();
+          const ad = aj.data || {};
+          item.country = ad.countryCode || '??';
+          item.countryName = ad.countryName || 'Unknown';
+          item.isp = ad.isp || 'Unknown';
+          item.abuse = ad.abuseConfidenceScore || 0;
+          item.reports = ad.totalReports || 0;
+          item.usageType = ad.usageType || 'Unknown';
+          item.isBR   = ad.countryCode === 'BR';
+          item.domain = ad.domain || '';
+          item.city   = ad.city   || '';
+          item.region = ad.region || '';
+          item.asn    = ad.asn    || '';
+        } catch {
+          item.country = '??'; item.countryName = 'Unknown'; item.isp = 'Erro';
+          item.abuse = 0; item.reports = 0; item.usageType = 'Unknown'; item.isBR = false;
+        }
+        if (!item.protection || item.protection === 'Unknown') item.protection = defaultProt;
+        await new Promise(res => setTimeout(res, 250));
+      }
+    }
+
+    document.getElementById('ocrProgressFill').style.width = '100%';
+    document.getElementById('ocrPct').textContent = '100%';
+
+    renderOCRResults();
+    document.getElementById('ocrProgress').classList.add('hidden');
+    document.getElementById('ocrResultsSection').classList.remove('hidden');
+    document.getElementById('ocrResultCount').textContent = `${ocrResults.length} IPs extraídos`;
+    document.getElementById('ocrStatus').textContent = `✓ ${ocrResults.length} IPs processados`;
+
+  } catch(e) {
+    document.getElementById('ocrStatus').textContent = '✗ Erro: ' + e.message;
+    document.getElementById('ocrProgress').classList.add('hidden');
+  }
+  document.getElementById('btnExtract').disabled = false;
+}
+
+function renderOCRResults() {
+  const ignoreBR = document.getElementById('ocrIgnoreBR').checked;
+  const container = document.getElementById('ocrResultsList');
+  const filtered = ignoreBR ? ocrResults.filter(r => !r.isBR) : ocrResults;
+
+  if (filtered.length === 0) {
+    container.innerHTML = '<div style="text-align:center;color:var(--text-secondary);padding:1rem;font-size:13px;">Nenhum IP encontrado na imagem.</div>';
+    return;
+  }
+
+  container.innerHTML = filtered.map((item, i) => {
+    const flag = countryFlags[item.country] || '';
+    const protNet = checkProtectedNetwork(item.ip);
+    const bc = protNet
+      ? (protNet.type === 'akamai' ? 'badge-akamai' : 'badge-internal')
+      : !item.abuse ? 'badge-low'
+      : item.abuse > 50 ? 'badge-high' : item.abuse > 20 ? 'badge-mid' : 'badge-low';
+    const abuseStr = protNet ? `🛡 ${protNet.label}` : (item.abuse !== undefined ? item.abuse + '%' : '—');
+    const btn = protNet
+      ? `<span style="font-size:11px;color:#f59e0b;">⚠ Protegido</span>`
+      : `<button class="btn btn-green btn-xs" onclick="adicionarOCRItem(${i})">+ Lista</button>`;
+    return `<div class="ocr-item" style="${protNet ? 'border-color:rgba(245,158,11,0.3);' : ''}">
+      <span class="ocr-item-ip">${item.ip}</span>
+      <span style="color:var(--text-secondary);font-size:11px;min-width:60px;">${flag} ${item.country || '??'}</span>
+      <span class="badge ${bc}" style="min-width:52px;">${abuseStr}</span>
+      <span class="ocr-item-prot" title="${escHtml(item.protection)}">${escHtml(item.protection || '—')}</span>
+      ${btn}
+    </div>`;
+  }).join('');
+}
+
+function adicionarOCRItem(idx) {
+  const ignoreBR = document.getElementById('ocrIgnoreBR').checked;
+  const filtered = ignoreBR ? ocrResults.filter(r => !r.isBR) : ocrResults;
+  const item = filtered[idx];
+  if (!item) return;
+  const protNet = checkProtectedNetwork(item.ip);
+  if (protNet) {
+    alert(`⚠ ATENÇÃO: ${item.ip} pertence à rede protegida:\n${protNet.label} (${protNet.cidr})\nNÃO deve ser bloqueado!`);
+    return;
+  }
+  if (ipList.find(x => x.ip === item.ip)) { alert('IP já está na lista.'); return; }
+  ipList.push({ id: ++idCounter, ...item });
+  renderList();
+  updateMetrics();
+}
+
+function adicionarTodosOCR() {
+  const ignoreBR = document.getElementById('ocrIgnoreBR').checked;
+  const filtered = ignoreBR ? ocrResults.filter(r => !r.isBR) : ocrResults;
+  let added = 0; let skipped = 0;
+  for (const item of filtered) {
+    if (checkProtectedNetwork(item.ip)) { skipped++; continue; }
+    if (!ipList.find(x => x.ip === item.ip)) {
+      ipList.push({ id: ++idCounter, ...item });
+      added++;
+    }
+  }
+  renderList();
+  updateMetrics();
+  const msg = skipped > 0
+    ? `✓ ${added} IPs adicionados — ⚠ ${skipped} protegidos ignorados (Akamai/Interno)`
+    : `✓ ${added} IPs adicionados à lista`;
+  document.getElementById('ocrStatus').textContent = msg;
+}
+
+function limparOCR() {
+  selectedFile = null;
+  ocrResults = [];
+  document.getElementById('imgPreview').style.display = 'none';
+  document.getElementById('imgPreview').src = '';
+  document.getElementById('ocrResultsSection').classList.add('hidden');
+  document.getElementById('ocrStatus').textContent = '';
+  document.getElementById('imageFile').value = '';
+}
+
+// ══════════════════════════════════════
+// SEÇÃO 3 — LISTA
+// ══════════════════════════════════════
+function removerIP(id) {
+  ipList = ipList.filter(x => x.id !== id);
+  renderList();
+  updateMetrics();
+}
+
+function renderList() {
+  const filterBR = document.getElementById('filterBRList').checked;
+  const filterLow = document.getElementById('filterLowList').checked;
+  const sortBy = document.getElementById('sortList') ? document.getElementById('sortList').value : 'abuse';
+
+  let data = [...ipList];
+  if (filterBR) data = data.filter(r => !r.isBR);
+  if (filterLow) data = data.filter(r => r.abuse >= 10);
+
+  if (sortBy === 'abuse') data.sort((a, b) => b.abuse - a.abuse);
+  else if (sortBy === 'reports') data.sort((a, b) => b.reports - a.reports);
+  else if (sortBy === 'country') data.sort((a, b) => a.country.localeCompare(b.country));
+  else if (sortBy === 'ip') data.sort((a, b) => {
+    const pa = a.ip.split('.').map(Number), pb = b.ip.split('.').map(Number);
+    for (let i = 0; i < 4; i++) if (pa[i] !== pb[i]) return pa[i] - pb[i];
+    return 0;
+  });
+
+  const container = document.getElementById('ipListContainer');
+
+  if (data.length === 0) {
+    container.innerHTML = '<div class="empty-list">Nenhum IP adicionado ainda.<br>Use as seções acima para adicionar IPs.</div>';
+    return;
+  }
+
+  container.innerHTML = data.map((r, i) => {
+    const flag = countryFlags[r.country] || '';
+    const bc = r.isBR ? 'badge-br' : r.abuse > 50 ? 'badge-high' : r.abuse > 20 ? 'badge-mid' : 'badge-low';
+    const rowClass = r.isBR ? 'ip-list-item is-br' : r.abuse > 50 ? 'ip-list-item is-high' : 'ip-list-item';
+    return `<div class="${rowClass}" id="row-${r.id}">
+      <span class="item-num">${i + 1}</span>
+      <span class="item-ip" title="${r.ip}">${r.ip}</span>
+      <span class="item-country" title="${r.countryName || r.country}">${flag} ${r.country}${r.city ? ' · '+r.city : ''}</span>
+      <span class="item-isp" title="${r.isp}">${r.isp}</span>
+      <span class="item-isp" title="${r.asn || '—'}" style="color:var(--accent-cyan);font-size:10px;">${r.asn || '—'}</span>
+      <span><span class="badge ${bc}">${r.abuse}%</span></span>
+      <span style="color:var(--text-secondary);font-size:11px;">${r.reports}</span>
+      <span class="item-prot" title="${escHtml(r.protection)}">${escHtml(r.protection || '—')}</span>
+      <button class="item-remove" onclick="removerIP(${r.id})" title="Remover">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function updateMetrics() {
+  document.getElementById('metTotal').textContent = ipList.length;
+  document.getElementById('metHigh').textContent = ipList.filter(r => r.abuse > 50).length;
+  document.getElementById('metBR').textContent = ipList.filter(r => r.isBR).length;
+  document.getElementById('metBlock').textContent = ipList.filter(r => !r.isBR).length;
+}
+
+function limparLista() {
+  if (ipList.length > 0 && !confirm(`Remover todos os ${ipList.length} IPs da lista?`)) return;
+  ipList = [];
+  renderList();
+  updateMetrics();
+}
+
+function generateCommands() {
+  const group = document.getElementById('groupName').value.trim() || gerarGrupoAtual();
+  const filtered = ipList.filter(r => !r.isBR && !checkProtectedNetwork(r.ip));
+  return filtered.map(r =>
+    `add host name "Host_${r.ip}" ip-address "${r.ip}" groups.1 "${group}" comments "Host responsavel por ${r.protection || 'Atividade Suspeita'}"`
+  ).join('\n');
+}
+
+function generateIPsOnly() {
+  return ipList.filter(r => !r.isBR && !checkProtectedNetwork(r.ip)).map(r => r.ip).join('\n');
+}
+
+function switchTab3(tabId) {
+  ['tabList','tabCmds','tabIPs'].forEach(t => document.getElementById(t).classList.add('hidden'));
+  document.getElementById(tabId).classList.remove('hidden');
+  document.querySelectorAll('.tabs .tab').forEach((btn, i) => {
+    btn.classList.toggle('active', ['tabList','tabCmds','tabIPs'][i] === tabId);
+  });
+  if (tabId === 'tabCmds') {
+    const cmds = generateCommands();
+    document.getElementById('cmdsOutput').textContent = cmds;
+    document.getElementById('cmdCount').textContent = ipList.filter(r => !r.isBR && !checkProtectedNetwork(r.ip)).length + ' comandos';
+  }
+  if (tabId === 'tabIPs') {
+    const ips = generateIPsOnly();
+    document.getElementById('ipsOutput').textContent = ips;
+    document.getElementById('ipCount').textContent = ipList.filter(r => !r.isBR && !checkProtectedNetwork(r.ip)).length + ' IPs';
+  }
+}
+
+function copiarOutput(elemId, btn) {
+  const text = document.getElementById(elemId).textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = '✓ Copiado!';
+    btn.style.color = 'var(--accent-green)';
+    setTimeout(() => { btn.textContent = orig; btn.style.color = ''; }, 2000);
+  });
+}
+
+// ══════════════════════════════════════
+// UTILS
+// ══════════════════════════════════════
+function escHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}

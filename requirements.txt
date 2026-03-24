@@ -1,0 +1,7 @@
+flask
+flask-cors
+requests
+pytesseract
+opencv-python
+numpy
+Pillow
