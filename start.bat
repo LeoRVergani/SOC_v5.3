@@ -4,6 +4,10 @@ title SOC IP Analyzer v5.5
 cd /d "%~dp0"
 color 0B
 
+:: CONFIG PYTHON AUTO INSTALL
+set "PYTHON_INSTALLER=python_installer.exe"
+set "PYTHON_URL=https://www.python.org/ftp/python/3.12.2/python-3.12.2-amd64.exe"
+
 echo.
 echo  ==========================================
 echo       SOC IP Analyzer v5.5 - Check Point
@@ -15,21 +19,32 @@ echo.
 :: ══════════════════════════════════════════
 echo  [1/5] Verificando Python...
 python --version >nul 2>&1
+
 if errorlevel 1 (
     echo  [AVISO] Python nao encontrado.
-    echo.
-    if exist "python-manager-26.0.msix" (
-        echo  Iniciando instalador do Python...
-        start "" "python-manager-26.0.msix"
-        echo.
-        echo  Instale o Python e execute este arquivo novamente.
+    echo  Baixando Python...
+
+    powershell -Command "Invoke-WebRequest -Uri '%PYTHON_URL%' -OutFile '%PYTHON_INSTALLER%'" >nul 2>&1
+
+    if exist "%PYTHON_INSTALLER%" (
+        echo  Instalando Python...
+
+        start /wait "" "%PYTHON_INSTALLER%" /quiet InstallAllUsers=1 PrependPath=1 Include_test=0
+
+        echo  Python instalado! Reiniciando script...
+        timeout /t 2 >nul
+
+        :: Reabre o próprio script já com Python instalado
+        start "" "%~f0"
+        exit /b
     ) else (
-        echo  Instale o Python em: https://python.org
+        echo  [ERRO] Falha ao baixar Python!
+        echo  Instale manualmente em: https://python.org
+        pause
+        exit /b 1
     )
-    echo.
-    pause
-    exit /b 1
 )
+
 echo  [OK] Python encontrado.
 echo.
 
@@ -72,25 +87,15 @@ echo  [3/5] Instalando dependencias Python...
 set PKGS=flask flask-cors requests pytesseract opencv-python numpy Pillow
 
 python -m pip install %PKGS% -q >nul 2>&1
-if not errorlevel 1 (
-    echo  [OK] Dependencias prontas.
-    goto :check_tesseract
-)
+if not errorlevel 1 goto :check_tesseract
 
 pip install %PKGS% -q >nul 2>&1
-if not errorlevel 1 (
-    echo  [OK] Dependencias prontas.
-    goto :check_tesseract
-)
+if not errorlevel 1 goto :check_tesseract
 
 pip3 install %PKGS% -q >nul 2>&1
-if not errorlevel 1 (
-    echo  [OK] Dependencias prontas.
-    goto :check_tesseract
-)
+if not errorlevel 1 goto :check_tesseract
 
 echo  [ERRO] Nao foi possivel instalar dependencias.
-echo  Tente manualmente: python -m pip install flask flask-cors requests pytesseract opencv-python numpy Pillow
 pause
 exit /b 1
 
@@ -101,88 +106,34 @@ exit /b 1
 echo.
 echo  [4/5] Verificando Tesseract OCR...
 
-:: Verifica no PATH primeiro
 tesseract --version >nul 2>&1
-if not errorlevel 1 (
-    echo  [OK] Tesseract encontrado no PATH.
-    goto :start_server
-)
+if not errorlevel 1 goto :start_server
 
-:: Verifica no caminho padrao de instalacao
-if exist "C:\Program Files\Tesseract-OCR\tesseract.exe" (
-    echo  [OK] Tesseract encontrado em C:\Program Files\Tesseract-OCR
-    goto :start_server
-)
+if exist "C:\Program Files\Tesseract-OCR\tesseract.exe" goto :start_server
 
-:: Tesseract nao encontrado — perguntar se deseja instalar
 echo  [AVISO] Tesseract nao encontrado.
 echo.
-echo  O Tesseract e necessario para a funcao de extrair IPs de prints/imagens.
-echo  Sem ele o servidor funciona normalmente, mas o OCR ficara desativado.
+echo  Deseja instalar agora?
+echo  [1] Sim
+echo  [2] Nao
 echo.
-echo  ----------------------------------------
-echo   Deseja baixar e instalar o Tesseract?
-echo  ----------------------------------------
-echo.
-echo   [1] Sim — baixar e instalar agora (recomendado)
-echo   [2] Nao — continuar sem OCR
-echo.
-set /p TESS_CHOICE="  Digite 1 ou 2 e pressione ENTER: "
+
+set /p TESS_CHOICE="Opcao: "
 
 if "!TESS_CHOICE!"=="1" goto :instalar_tesseract
-if "!TESS_CHOICE!"=="2" goto :skip_tesseract
-
-echo  Opcao invalida. Continuando sem Tesseract.
 goto :skip_tesseract
 
 :instalar_tesseract
-echo.
-echo  Baixando Tesseract v5.4.0...
-echo  (pode demorar alguns minutos dependendo da sua conexao)
-echo.
-
 set TESS_URL=https://github.com/UB-Mannheim/tesseract/releases/download/v5.4.0.20240606/tesseract-ocr-w64-setup-5.4.0.20240606.exe
-set TESS_FILE=%TEMP%\tesseract-setup.exe
+set TESS_FILE=%TEMP%\tesseract.exe
 
-:: Tenta baixar com PowerShell (disponivel no Windows 7+)
-powershell -Command "& { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri '%TESS_URL%' -OutFile '%TESS_FILE%' -UseBasicParsing }" >nul 2>&1
-
-if not exist "%TESS_FILE%" (
-    echo  [ERRO] Falha ao baixar o instalador.
-    echo  Baixe manualmente em:
-    echo  https://github.com/UB-Mannheim/tesseract/releases
-    echo.
-    goto :skip_tesseract
-)
-
-echo  [OK] Download concluido.
-echo.
-echo  ============================================================
-echo   INSTALACAO DO TESSERACT
-echo  ============================================================
-echo.
-echo   O instalador sera aberto agora.
-echo.
-echo   IMPORTANTE:
-echo   1. Conclua a instalacao normalmente
-echo   2. Mantenha o caminho padrao sugerido pelo instalador
-echo   3. Apos finalizar, FECHE esta janela e abra o start.bat
-echo      novamente para iniciar o servidor com OCR ativado.
-echo.
-echo  ============================================================
-echo.
-pause
+powershell -Command "Invoke-WebRequest -Uri '%TESS_URL%' -OutFile '%TESS_FILE%'" >nul 2>&1
 
 start "" "%TESS_FILE%"
-
-echo.
-echo  Quando terminar a instalacao, feche e reabra o start.bat.
-echo.
-pause
-exit /b 0
+exit /b
 
 :skip_tesseract
-echo  [INFO] Continuando sem Tesseract — OCR desativado.
+echo  [INFO] Continuando sem OCR.
 echo.
 
 :: ══════════════════════════════════════════
@@ -193,24 +144,10 @@ echo  [5/5] Iniciando servidor...
 echo.
 echo  ==========================================
 echo   Acesse: http://127.0.0.1:5000
-echo   Para encerrar feche esta janela.
 echo  ==========================================
 echo.
 
-:: Informa status do OCR
-if exist "C:\Program Files\Tesseract-OCR\tesseract.exe" (
-    echo  OCR: ATIVO  - extracao de prints disponivel
-) else (
-    tesseract --version >nul 2>&1
-    if not errorlevel 1 (
-        echo  OCR: ATIVO  - extracao de prints disponivel
-    ) else (
-        echo  OCR: INATIVO - instale o Tesseract para usar OCR
-    )
-)
-echo.
-
-timeout /t 2 /nobreak >nul
+timeout /t 2 >nul
 start "" "http://127.0.0.1:5000"
 python server.py
 
