@@ -10,7 +10,7 @@ set "PYTHON_URL=https://www.python.org/ftp/python/3.12.2/python-3.12.2-amd64.exe
 
 echo.
 echo  ==========================================
-echo       SOC IP Analyzer v5.5 - Check Point
+echo       SOC IP Analyzer v5.6 - Check Point
 echo  ==========================================
 echo.
 
